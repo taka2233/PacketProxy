@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 package packetproxy.gui;
-
 import static packetproxy.util.Logging.errWithStackTrace;
 
 import java.awt.Color;
@@ -25,15 +24,12 @@ import java.io.File;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.SwingUtilities;
-import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
@@ -51,14 +47,12 @@ public class GUIFilterConfig {
 	private ProjectTableModel project_model;
 	private JTable table;
 	private JComponent jcomponent;
-
 	// private JTextField sort_field;
 	// TableRowSorter<ProjectTableModel> sorter;
 
 	public class ProjectTableModel extends DefaultTableModel {
 
 		private static final long serialVersionUID = 1L;
-
 		ProjectTableModel(String[] columnNames, int rowNum) {
 			super(columnNames, rowNum);
 		}
@@ -68,7 +62,6 @@ public class GUIFilterConfig {
 			return getValueAt(0, column).getClass();
 		}
 	}
-
 	public GUIFilterConfig(JFrame owner) throws Exception {
 		this.owner = owner;
 		jcomponent = createComponent();
@@ -122,7 +115,6 @@ public class GUIFilterConfig {
 		project_model = new ProjectTableModel(menu, 0) {
 
 			private static final long serialVersionUID = 1L;
-
 			@Override
 			public boolean isCellEditable(int row, int column) {
 				return false;
@@ -262,12 +254,12 @@ public class GUIFilterConfig {
 			public void mouseClicked(MouseEvent e) {
 				try {
 
-					JFileChooser filechooser = new JFileChooser();
+					NativeFileChooser filechooser = new NativeFileChooser();
 					filechooser.setCurrentDirectory(new File(defaultDir));
-					filechooser.setFileFilter(new FileNameExtensionFilter("*.json", "json"));
-					filechooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-					int selected = filechooser.showOpenDialog(SwingUtilities.getRoot(owner));
-					if (selected == JFileChooser.APPROVE_OPTION) {
+					filechooser.addChoosableFileFilter("*.json", "json");
+					filechooser.setAcceptAllFileFilterUsed(false);
+					int selected = filechooser.showOpenDialog(owner);
+					if (selected == NativeFileChooser.APPROVE_OPTION) {
 
 						File file = filechooser.getSelectedFile();
 						byte[] jbytes = Utils.readfile(file.getAbsolutePath());

@@ -14,21 +14,17 @@
  * limitations under the License.
  */
 package packetproxy.gui;
-
 import static packetproxy.util.Logging.errWithStackTrace;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.io.File;
-import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
-import javax.swing.SwingUtilities;
-import javax.swing.filechooser.FileNameExtensionFilter;
 import packetproxy.common.ConfigIO;
 import packetproxy.common.I18nString;
 import packetproxy.common.RecentProjectsStore;
@@ -43,11 +39,9 @@ public class GUIMenu extends JMenuBar {
 	private static final String defaultDir = System.getProperty("user.home");
 	GUIMenu self;
 	JFrame owner;
-
 	private enum Panes {
 		HISTORY, INTERCEPT, RESENDER, BULKSENDER, OPTIONS, LOG
 	};
-
 	public GUIMenu(JFrame owner) {
 		self = this;
 		this.owner = owner;
@@ -131,12 +125,12 @@ public class GUIMenu extends JMenuBar {
 			public void actionPerformed(ActionEvent e) {
 				try {
 
-					JFileChooser filechooser = new JFileChooser();
+					NativeFileChooser filechooser = new NativeFileChooser();
 					filechooser.setCurrentDirectory(new File(defaultDir));
-					filechooser.setFileFilter(new FileNameExtensionFilter("*.sqlite3", "sqlite3"));
-					filechooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-					int selected = filechooser.showOpenDialog(SwingUtilities.getRoot(self));
-					if (selected == JFileChooser.APPROVE_OPTION) {
+					filechooser.addChoosableFileFilter("*.sqlite3", "sqlite3");
+					filechooser.setAcceptAllFileFilterUsed(false);
+					int selected = filechooser.showOpenDialog(owner);
+					if (selected == NativeFileChooser.APPROVE_OPTION) {
 
 						File file = filechooser.getSelectedFile();
 						Database.getInstance().Load(file.getAbsolutePath());
@@ -261,12 +255,12 @@ public class GUIMenu extends JMenuBar {
 			public void actionPerformed(ActionEvent e) {
 				try {
 
-					JFileChooser filechooser = new JFileChooser();
+					NativeFileChooser filechooser = new NativeFileChooser();
 					filechooser.setCurrentDirectory(new File(defaultDir));
-					filechooser.setFileFilter(new FileNameExtensionFilter("*.json", "json"));
-					filechooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-					int selected = filechooser.showOpenDialog(SwingUtilities.getRoot(self));
-					if (selected == JFileChooser.APPROVE_OPTION) {
+					filechooser.addChoosableFileFilter("*.json", "json");
+					filechooser.setAcceptAllFileFilterUsed(false);
+					int selected = filechooser.showOpenDialog(owner);
+					if (selected == NativeFileChooser.APPROVE_OPTION) {
 
 						File file = filechooser.getSelectedFile();
 						byte[] jbytes = Utils.readfile(file.getAbsolutePath());

@@ -30,6 +30,8 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.yield
+import org.jline.jansi.Ansi
+import org.jline.jansi.Ansi.Color.RED
 import org.slf4j.LoggerFactory
 import packetproxy.gui.GUILog
 
@@ -51,11 +53,6 @@ object Logging {
     val logFile = File(logFilePath)
     if (!logFile.exists()) throw IOException("not found: ${logFile.absolutePath}")
     logFile
-  }
-
-  private fun formatString(format: String, vararg args: Any?): String {
-    val now = LocalDateTime.now()
-    return dtf.format(now) + "       " + String.format(format, *args)
   }
 
   @JvmStatic
@@ -110,18 +107,21 @@ object Logging {
   fun err(format: String, vararg args: Any?) {
     val fs = formatString(format, *args)
 
-    logger.error(fs)
+    logger.error(Ansi.ansi().fg(RED).a(fs).reset().toString())
     if (!isGulp) guiLog.appendErr(fs)
   }
 
+  /** 別のログが挟まらないように一塊にした上で１度に出力する */
   @JvmStatic
   @Throws(IllegalFormatException::class)
   fun errWithStackTrace(e: Throwable) {
-    err(e.toString())
-    val stackTrace = e.stackTrace
-    for (element in stackTrace) {
-      err(element.toString())
+    val sb = StringBuilder()
+    sb.append(e.toString())
+
+    for (element in e.stackTrace) {
+      sb.append("\n$element")
     }
+    err(sb.toString())
   }
 
   /** logの継続出力を行う */
@@ -145,5 +145,24 @@ object Logging {
     while (raf.filePointer < initialLength) {
       println(raf.readUtf8Line())
     }
+  }
+
+  /** 第１引数が文字列でないなどの場合はtoString()を実行する 第１引数が文字列かつ第２引数移行が正しく指定されている場合のみフォーマット指定子としての解釈を行う */
+  private fun formatString(format: Any, vararg args: Any?): String {
+    val dateTime = dtf.format(LocalDateTime.now()) + "     "
+    val indent = " ".repeat(dateTime.length)
+
+    val msg =
+      if (format is String && args.isNotEmpty()) {
+        try {
+          format.format(*args)
+        } catch (e: Exception) {
+          format
+        }
+      } else {
+        format.toString()
+      }
+
+    return dateTime + msg.replace("\n", "\n$indent")
   }
 }

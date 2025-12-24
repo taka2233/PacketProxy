@@ -28,6 +28,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JFrame;
+import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
@@ -37,6 +38,8 @@ import org.apache.commons.io.FileUtils;
 import packetproxy.controller.ResendController;
 import packetproxy.http.HeaderField;
 import packetproxy.http.Http;
+import packetproxy.model.AutoColorRule;
+import packetproxy.model.AutoColorRules;
 import packetproxy.model.Packet;
 import packetproxy.model.Packets;
 import packetproxy.util.CharSetUtility;
@@ -286,6 +289,36 @@ public class GUIHistoryContextMenuFactory {
 			}
 		});
 
+		// Auto color rules submenu
+		JMenu autoColorMenu = new JMenu("Auto color rules");
+
+		JMenuItem autoColorGreen = createMenuItem("Add rule (green) for this endpoint", -1, null, e -> {
+			addAutoColorRule(gui_packet, AutoColorRule.Color.GREEN, owner);
+		});
+
+		JMenuItem autoColorBrown = createMenuItem("Add rule (brown) for this endpoint", -1, null, e -> {
+			addAutoColorRule(gui_packet, AutoColorRule.Color.BROWN, owner);
+		});
+
+		JMenuItem autoColorYellow = createMenuItem("Add rule (yellow) for this endpoint", -1, null, e -> {
+			addAutoColorRule(gui_packet, AutoColorRule.Color.YELLOW, owner);
+		});
+
+		JMenuItem manageAutoColorRules = createMenuItem("Manage rules...", -1, null, e -> {
+			try {
+				GUIAutoColorRulesDialog dialog = new GUIAutoColorRulesDialog(owner);
+				dialog.showDialog();
+			} catch (Exception ex) {
+				errWithStackTrace(ex);
+			}
+		});
+
+		autoColorMenu.add(autoColorGreen);
+		autoColorMenu.add(autoColorBrown);
+		autoColorMenu.add(autoColorYellow);
+		autoColorMenu.addSeparator();
+		autoColorMenu.add(manageAutoColorRules);
+
 		JMenuItem delete_selected_items = createMenuItem("delete selected items", -1, null, e -> {
 			try {
 				int[] selected_rows = table.getSelectedRows();
@@ -356,11 +389,38 @@ public class GUIHistoryContextMenuFactory {
 		menu.add(addColorB);
 		menu.add(addColorY);
 		menu.add(clearColor);
+		// Auto color rules機能は新しいプロジェクトでのみ利用可能
+		if (AutoColorRules.isAvailable()) {
+			menu.add(autoColorMenu);
+		}
 		menu.add(copyAsCurl);
 		menu.add(delete_selected_items);
 		menu.add(delete_all);
 
 		return new Handles(menu, send, sendToResender, copy, copyAll);
+	}
+
+	private static void addAutoColorRule(GUIPacket gui_packet, AutoColorRule.Color color, JFrame owner) {
+		try {
+			Packet packet = gui_packet.getPacket();
+			if (packet == null) {
+				JOptionPane.showMessageDialog(owner, "No packet selected.", "Error", JOptionPane.ERROR_MESSAGE);
+				return;
+			}
+
+			Http http = Http.create(packet.getDecodedData());
+			String url = http.getURL(packet.getServerPort(), packet.getUseSSL());
+
+			// GUIAutoColorRuleAddDialogを使用して追加
+			GUIAutoColorRuleAddDialog dialog = new GUIAutoColorRuleAddDialog(owner, url, color);
+			dialog.showDialog();
+		} catch (Exception ex) {
+			errWithStackTrace(ex);
+			JOptionPane.showMessageDialog(owner,
+					"Failed to add auto color rule: " + ex.getMessage(),
+					"Error",
+					JOptionPane.ERROR_MESSAGE);
+		}
 	}
 
 	private static JMenuItem createMenuItem(String name, int key, KeyStroke hotkey, ActionListener l) {

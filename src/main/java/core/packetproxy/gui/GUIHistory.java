@@ -15,6 +15,7 @@
  */
 package packetproxy.gui;
 
+import static packetproxy.model.PropertyChangeEventType.AUTO_COLOR_RULES;
 import static packetproxy.model.PropertyChangeEventType.DATABASE_MESSAGE;
 import static packetproxy.model.PropertyChangeEventType.FILTERS;
 import static packetproxy.model.PropertyChangeEventType.PACKETS;
@@ -73,6 +74,9 @@ import packetproxy.common.FilterTextParser;
 import packetproxy.common.FontManager;
 import packetproxy.common.I18nString;
 import packetproxy.common.Utils;
+import packetproxy.http.Http;
+import packetproxy.model.AutoColorRule;
+import packetproxy.model.AutoColorRules;
 import packetproxy.model.Database;
 import packetproxy.model.Database.DatabaseMessage;
 import packetproxy.model.Filters;
@@ -146,6 +150,7 @@ public class GUIHistory implements PropertyChangeListener {
 		packets.addPropertyChangeListener(this);
 		ResenderPackets.getInstance().initTable(restore);
 		Filters.getInstance().addPropertyChangeListener(this);
+		AutoColorRules.getInstance().addPropertyChangeListener(this);
 		gui_packet = GUIPacket.getInstance();
 		colorManager = new TableCustomColorManager();
 		preferredPosition = 0;
@@ -647,6 +652,9 @@ public class GUIHistory implements PropertyChangeListener {
 		} else if (DATABASE_MESSAGE.matches(evt)) {
 
 			handleDatabaseMessagePropertyChange(evt);
+		} else if (AUTO_COLOR_RULES.matches(evt)) {
+
+			handleAutoColorRulesPropertyChange(evt);
 		}
 	}
 
@@ -690,6 +698,11 @@ public class GUIHistory implements PropertyChangeListener {
 			Packet packet = packets.query(positiveValue);
 			long groupId = packet.getGroup();
 			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
+
+			// 自動色付けルールを適用（機能が利用可能な場合のみ）
+			if (AutoColorRules.isAvailable()) {
+				applyAutoColorRule(packet);
+			}
 
 			// レスポンスで、同じグループIDのリクエスト行が存在し、まだレスポンスがない場合はマージ
 			if (isResponse && groupId != 0 && group_row.containsKey(groupId) && !group_has_response.contains(groupId)) {
@@ -760,6 +773,85 @@ public class GUIHistory implements PropertyChangeListener {
 				errWithStackTrace(e);
 			}
 		});
+	}
+
+	private void handleAutoColorRulesPropertyChange(PropertyChangeEvent evt) {
+		if (!AutoColorRules.isAvailable()) {
+			return;
+		}
+		SwingUtilities.invokeLater(() -> {
+			try {
+				applyAutoColorRulesToAllPackets();
+			} catch (Exception e) {
+				errWithStackTrace(e);
+			}
+		});
+	}
+
+	/**
+	 * 全パケットに対して自動色付けルールを適用する
+	 */
+	private void applyAutoColorRulesToAllPackets() {
+		new SwingWorker<Void, Void>() {
+			@Override
+			protected Void doInBackground() throws Exception {
+				List<Packet> allPackets = packets.queryAll();
+				for (Packet packet : allPackets) {
+					// リクエストパケットのみ対象
+					if (packet.getDirection() != Packet.Direction.CLIENT) {
+						continue;
+					}
+
+					// デコードされたデータからURLを取得
+					byte[] data = packet.getDecodedData();
+					if (data == null || data.length == 0) {
+						continue;
+					}
+
+					String endpoint;
+					try {
+						Http http = Http.create(data);
+						endpoint = http.getURL(packet.getServerPort(), packet.getUseSSL());
+					} catch (Exception e) {
+						// HTTPパースに失敗した場合はサーバー名とポートで構成
+						endpoint = (packet.getUseSSL() ? "https://" : "http://")
+								+ packet.getServerName() + ":" + packet.getServerPort();
+					}
+
+					// 自動色付けルールをチェック
+					var matchingColor = AutoColorRules.getInstance().findMatchingColor(endpoint);
+					if (matchingColor.isPresent()) {
+						AutoColorRule.Color color = matchingColor.get();
+						String colorValue = color.getValue();
+
+						// パケットに色を設定して保存
+						if (!colorValue.equals(packet.getColor())) {
+							packet.setColor(colorValue);
+							packets.updateWithoutNotify(packet);
+						}
+
+						// colorManagerにも追加
+						Color awtColor = getAwtColorFromColorValue(colorValue);
+						if (awtColor != null) {
+							colorManager.add(packet.getId(), awtColor);
+						}
+					} else {
+						// ルールにマッチしない場合は色をクリア
+						if (packet.getColor() != null && !packet.getColor().isEmpty()) {
+							packet.setColor(null);
+							packets.updateWithoutNotify(packet);
+						}
+						colorManager.clear(packet.getId());
+					}
+				}
+				return null;
+			}
+
+			@Override
+			protected void done() {
+				table.repaint();
+			}
+		}.execute();
 	}
 
 	public void updateRequestOne(int id) throws Exception {
@@ -1145,5 +1237,76 @@ public class GUIHistory implements PropertyChangeListener {
 	public boolean isSelectedRowMerged() {
 		int packetId = getSelectedPacketId();
 		return getResponsePacketIdForRequest(packetId) != -1;
+	}
+
+	/**
+	 * パケットに対して自動色付けルールを適用する
+	 * @param packet 対象のパケット
+	 */
+	private void applyAutoColorRule(Packet packet) {
+		try {
+			// リクエストパケットのみ対象（レスポンスは同じグループのリクエストの色を継承）
+			if (packet.getDirection() != Packet.Direction.CLIENT) {
+				return;
+			}
+
+			// 既に色が設定されている場合はスキップ
+			if (packet.getColor() != null && !packet.getColor().isEmpty()) {
+				return;
+			}
+
+			// デコードされたデータからURLを取得
+			byte[] data = packet.getDecodedData();
+			if (data == null || data.length == 0) {
+				return;
+			}
+
+			String endpoint;
+			try {
+				Http http = Http.create(data);
+				endpoint = http.getURL(packet.getServerPort(), packet.getUseSSL());
+			} catch (Exception e) {
+				// HTTPパースに失敗した場合はサーバー名とポートで構成
+				endpoint = (packet.getUseSSL() ? "https://" : "http://")
+						+ packet.getServerName() + ":" + packet.getServerPort();
+			}
+
+			// 自動色付けルールをチェック
+			var matchingColor = AutoColorRules.getInstance().findMatchingColor(endpoint);
+			if (matchingColor.isPresent()) {
+				AutoColorRule.Color color = matchingColor.get();
+				String colorValue = color.getValue();
+
+				// パケットに色を設定して保存
+				packet.setColor(colorValue);
+				packets.update(packet);
+
+				// colorManagerにも追加
+				Color awtColor = getAwtColorFromColorValue(colorValue);
+				if (awtColor != null) {
+					colorManager.add(packet.getId(), awtColor);
+				}
+			}
+		} catch (Exception e) {
+			errWithStackTrace(e);
+		}
+	}
+
+	/**
+	 * 色の文字列値からAWT Colorオブジェクトを取得
+	 * @param colorValue 色の文字列値（"green", "brown", "yellow"）
+	 * @return 対応するColor、不明な場合はnull
+	 */
+	private Color getAwtColorFromColorValue(String colorValue) {
+		switch (colorValue) {
+			case "green":
+				return packetColorGreen;
+			case "brown":
+				return packetColorBrown;
+			case "yellow":
+				return packetColorYellow;
+			default:
+				return null;
+		}
 	}
 }

@@ -127,6 +127,16 @@ public class Packets implements PropertyChangeListener {
 		executor.execute(task);
 	}
 
+	/**
+	 * パケットを更新するが、PropertyChangeイベントを発火しない
+	 * 自動色付けなど、大量のパケットを更新する際に使用
+	 */
+	public void updateWithoutNotify(Packet packet) throws Exception {
+		synchronized (dao) {
+			dao.update(packet);
+		}
+	}
+
 	public void deleteAll() throws Exception {
 		synchronized (dao) {
 			dao.deleteBuilder().delete();
@@ -150,7 +160,7 @@ public class Packets implements PropertyChangeListener {
 	}
 
 	public List<Packet> queryAllIdsAndColors() throws Exception {
-		return dao.queryBuilder().selectColumns("id", "color").orderBy("id", true).query();
+		return dao.queryBuilder().selectColumns("id", "color", "direction", "group").orderBy("id", true).query();
 	}
 
 	public List<Packet> queryRange(long offset, long limit) throws Exception {

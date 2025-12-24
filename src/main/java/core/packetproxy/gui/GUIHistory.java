@@ -15,6 +15,7 @@
  */
 package packetproxy.gui;
 
+import static packetproxy.model.PropertyChangeEventType.AUTO_COLOR_RULES;
 import static packetproxy.model.PropertyChangeEventType.DATABASE_MESSAGE;
 import static packetproxy.model.PropertyChangeEventType.FILTERS;
 import static packetproxy.model.PropertyChangeEventType.PACKETS;
@@ -73,6 +74,9 @@ import packetproxy.common.FilterTextParser;
 import packetproxy.common.FontManager;
 import packetproxy.common.I18nString;
 import packetproxy.common.Utils;
+import packetproxy.http.Http;
+import packetproxy.model.AutoColorRule;
+import packetproxy.model.AutoColorRules;
 import packetproxy.model.Database;
 import packetproxy.model.Database.DatabaseMessage;
 import packetproxy.model.Filters;
@@ -134,16 +138,27 @@ public class GUIHistory implements PropertyChangeListener {
 	private Color packetColorBrown = new Color(0xd2, 0x69, 0x1e);
 	private Color packetColorYellow = new Color(0xff, 0xd7, 0x00);
 
+	// グループIDと行番号のマッピング（リクエスト行を追跡）
+	private Hashtable<Long, Integer> group_row;
+	// レスポンスが既にマージされているグループID
+	private HashSet<Long> group_has_response;
+	// レスポンスパケットIDとリクエストパケットIDのマッピング（マージされた行用）
+	private Hashtable<Integer, Integer> response_to_request_id;
+
 	private GUIHistory(boolean restore) throws Exception {
 		packets = Packets.getInstance(restore);
 		packets.addPropertyChangeListener(this);
 		ResenderPackets.getInstance().initTable(restore);
 		Filters.getInstance().addPropertyChangeListener(this);
+		AutoColorRules.getInstance().addPropertyChangeListener(this);
 		gui_packet = GUIPacket.getInstance();
 		colorManager = new TableCustomColorManager();
 		preferredPosition = 0;
 		update_packet_ids = new HashSet<Integer>();
 		id_row = new Hashtable<Integer, Integer>();
+		group_row = new Hashtable<Long, Integer>();
+		group_has_response = new HashSet<Long>();
+		response_to_request_id = new Hashtable<Integer, Integer>();
 		autoScroll = new GUIHistoryAutoScroll();
 	}
 
@@ -637,6 +652,9 @@ public class GUIHistory implements PropertyChangeListener {
 		} else if (DATABASE_MESSAGE.matches(evt)) {
 
 			handleDatabaseMessagePropertyChange(evt);
+		} else if (AUTO_COLOR_RULES.matches(evt)) {
+
+			handleAutoColorRulesPropertyChange(evt);
 		}
 	}
 
@@ -677,8 +695,45 @@ public class GUIHistory implements PropertyChangeListener {
 		if (value < 0) {
 
 			int positiveValue = value * -1;
-			tableModel.addRow(makeRowDataFromPacket(packets.query(positiveValue)));
-			id_row.put(positiveValue, tableModel.getRowCount() - 1);
+			Packet packet = packets.query(positiveValue);
+			long groupId = packet.getGroup();
+			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
+
+			// 自動色付けルールを適用（機能が利用可能な場合のみ）
+			if (AutoColorRules.isAvailable()) {
+				applyAutoColorRule(packet);
+			}
+
+			// レスポンスで、同じグループIDのリクエスト行が存在し、まだレスポンスがない場合はマージ
+			if (isResponse && groupId != 0 && group_row.containsKey(groupId) && !group_has_response.contains(groupId)) {
+
+				int rowIndex = group_row.get(groupId);
+				int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
+
+				// Server Response列を更新
+				tableModel.setValueAt(packet.getSummarizedResponse(), rowIndex, 2);
+				// Length列を更新（リクエスト + レスポンスの合計）
+				int currentLength = (Integer) tableModel.getValueAt(rowIndex, 3);
+				byte[] responseData = packet.getDecodedData().length > 0 ? packet.getDecodedData() : packet.getModifiedData();
+				tableModel.setValueAt(currentLength + responseData.length, rowIndex, 3);
+
+				// マッピングを更新
+				group_has_response.add(groupId);
+				response_to_request_id.put(positiveValue, requestPacketId);
+				id_row.put(positiveValue, rowIndex);
+			} else {
+
+				// 新しい行を追加
+				tableModel.addRow(makeRowDataFromPacket(packet));
+				int rowIndex = tableModel.getRowCount() - 1;
+				id_row.put(positiveValue, rowIndex);
+
+				// リクエストの場合はグループマッピングに追加
+				if (!isResponse && groupId != 0) {
+
+					group_row.put(groupId, rowIndex);
+				}
+			}
 		} else {
 
 			updateRequestOne(value);
@@ -718,6 +773,85 @@ public class GUIHistory implements PropertyChangeListener {
 				errWithStackTrace(e);
 			}
 		});
+	}
+
+	private void handleAutoColorRulesPropertyChange(PropertyChangeEvent evt) {
+		if (!AutoColorRules.isAvailable()) {
+			return;
+		}
+		SwingUtilities.invokeLater(() -> {
+			try {
+				applyAutoColorRulesToAllPackets();
+			} catch (Exception e) {
+				errWithStackTrace(e);
+			}
+		});
+	}
+
+	/**
+	 * 全パケットに対して自動色付けルールを適用する
+	 */
+	private void applyAutoColorRulesToAllPackets() {
+		new SwingWorker<Void, Void>() {
+			@Override
+			protected Void doInBackground() throws Exception {
+				List<Packet> allPackets = packets.queryAll();
+				for (Packet packet : allPackets) {
+					// リクエストパケットのみ対象
+					if (packet.getDirection() != Packet.Direction.CLIENT) {
+						continue;
+					}
+
+					// デコードされたデータからURLを取得
+					byte[] data = packet.getDecodedData();
+					if (data == null || data.length == 0) {
+						continue;
+					}
+
+					String endpoint;
+					try {
+						Http http = Http.create(data);
+						endpoint = http.getURL(packet.getServerPort(), packet.getUseSSL());
+					} catch (Exception e) {
+						// HTTPパースに失敗した場合はサーバー名とポートで構成
+						endpoint = (packet.getUseSSL() ? "https://" : "http://")
+								+ packet.getServerName() + ":" + packet.getServerPort();
+					}
+
+					// 自動色付けルールをチェック
+					var matchingColor = AutoColorRules.getInstance().findMatchingColor(endpoint);
+					if (matchingColor.isPresent()) {
+						AutoColorRule.Color color = matchingColor.get();
+						String colorValue = color.getValue();
+
+						// パケットに色を設定して保存
+						if (!colorValue.equals(packet.getColor())) {
+							packet.setColor(colorValue);
+							packets.updateWithoutNotify(packet);
+						}
+
+						// colorManagerにも追加
+						Color awtColor = getAwtColorFromColorValue(colorValue);
+						if (awtColor != null) {
+							colorManager.add(packet.getId(), awtColor);
+						}
+					} else {
+						// ルールにマッチしない場合は色をクリア
+						if (packet.getColor() != null && !packet.getColor().isEmpty()) {
+							packet.setColor(null);
+							packets.updateWithoutNotify(packet);
+						}
+						colorManager.clear(packet.getId());
+					}
+				}
+				return null;
+			}
+
+			@Override
+			protected void done() {
+				table.repaint();
+			}
+		}.execute();
 	}
 
 	public void updateRequestOne(int id) throws Exception {
@@ -788,10 +922,46 @@ public class GUIHistory implements PropertyChangeListener {
 	public void updateAll() throws Exception {
 		List<Packet> packetList = packets.queryAll();
 		tableModel.setRowCount(0);
+		id_row.clear();
+		group_row.clear();
+		group_has_response.clear();
+		response_to_request_id.clear();
+
 		for (Packet packet : packetList) {
 
-			tableModel.addRow(makeRowDataFromPacket(packet));
-			id_row.put(packet.getId(), tableModel.getRowCount() - 1);
+			long groupId = packet.getGroup();
+			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
+
+			// レスポンスで、同じグループIDのリクエスト行が存在し、まだレスポンスがない場合はマージ
+			if (isResponse && groupId != 0 && group_row.containsKey(groupId) && !group_has_response.contains(groupId)) {
+
+				int rowIndex = group_row.get(groupId);
+				int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
+
+				// Server Response列を更新
+				tableModel.setValueAt(packet.getSummarizedResponse(), rowIndex, 2);
+				// Length列を更新
+				int currentLength = (Integer) tableModel.getValueAt(rowIndex, 3);
+				byte[] responseData = packet.getDecodedData().length > 0 ? packet.getDecodedData() : packet.getModifiedData();
+				tableModel.setValueAt(currentLength + responseData.length, rowIndex, 3);
+
+				// マッピングを更新
+				group_has_response.add(groupId);
+				response_to_request_id.put(packet.getId(), requestPacketId);
+				id_row.put(packet.getId(), rowIndex);
+			} else {
+
+				// 新しい行を追加
+				tableModel.addRow(makeRowDataFromPacket(packet));
+				int rowIndex = tableModel.getRowCount() - 1;
+				id_row.put(packet.getId(), rowIndex);
+
+				// リクエストの場合はグループマッピングに追加
+				if (!isResponse && groupId != 0) {
+
+					group_row.put(groupId, rowIndex);
+				}
+			}
 		}
 		update_packet_ids.clear();
 	}
@@ -800,14 +970,42 @@ public class GUIHistory implements PropertyChangeListener {
 		List<Packet> packetList = packets.queryAllIdsAndColors();
 		tableModel.setRowCount(0);
 		colorManager.clear();
+		id_row.clear();
+		group_row.clear();
+		group_has_response.clear();
+		response_to_request_id.clear();
+
 		for (Packet packet : packetList) {
 
 			int id = packet.getId();
 			String color = packet.getColor();
+			long groupId = packet.getGroup();
+			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
 
-			tableModel.addRow(new Object[]{packet.getId(), "Loading...", "Loading...", 0, "Loading...", "",
-					"Loading...", "", "00:00:00 1900/01/01 Z", false, false, "", "", "", (long) -1});
-			id_row.put(id, tableModel.getRowCount() - 1);
+			// レスポンスで、同じグループIDのリクエスト行が存在し、まだレスポンスがない場合はマージ
+			if (isResponse && groupId != 0 && group_row.containsKey(groupId) && !group_has_response.contains(groupId)) {
+
+				int rowIndex = group_row.get(groupId);
+				int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
+
+				// マッピングを更新（実際のデータは後で updateOne で更新される）
+				group_has_response.add(groupId);
+				response_to_request_id.put(id, requestPacketId);
+				id_row.put(id, rowIndex);
+			} else {
+
+				// 新しい行を追加
+				tableModel.addRow(new Object[]{packet.getId(), "Loading...", "Loading...", 0, "Loading...", "",
+						"Loading...", "", "00:00:00 1900/01/01 Z", false, false, "", "", "", (long) -1});
+				int rowIndex = tableModel.getRowCount() - 1;
+				id_row.put(id, rowIndex);
+
+				// リクエストの場合はグループマッピングに追加
+				if (!isResponse && groupId != 0) {
+
+					group_row.put(groupId, rowIndex);
+				}
+			}
 
 			if (Objects.equals(color, "green")) {
 
@@ -889,10 +1087,42 @@ public class GUIHistory implements PropertyChangeListener {
 
 			return;
 		}
-		Integer row_index = id_row.getOrDefault(packet.getId(), tableModel.getRowCount() - 1);
+
+		int packetId = packet.getId();
+		boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
+
+		// マージされたレスポンスパケットの場合、リクエスト行を更新
+		if (isResponse && response_to_request_id.containsKey(packetId)) {
+
+			Integer row_index = id_row.get(packetId);
+			if (row_index != null) {
+
+				// Server Response列のみ更新
+				tableModel.setValueAt(packet.getSummarizedResponse(), row_index, 2);
+				// Length列を再計算
+				int requestPacketId = response_to_request_id.get(packetId);
+				Packet requestPacket = packets.query(requestPacketId);
+				byte[] requestData = requestPacket.getDecodedData().length > 0 ? requestPacket.getDecodedData() : requestPacket.getModifiedData();
+				byte[] responseData = packet.getDecodedData().length > 0 ? packet.getDecodedData() : packet.getModifiedData();
+				tableModel.setValueAt(requestData.length + responseData.length, row_index, 3);
+			}
+			return;
+		}
+
+		Integer row_index = id_row.getOrDefault(packetId, tableModel.getRowCount() - 1);
 		Object[] row_data = makeRowDataFromPacket(packet);
 
+		// リクエストパケットの更新時、マージされたレスポンス情報を保持
+		long groupId = packet.getGroup();
+		boolean hasResponse = groupId != 0 && group_has_response.contains(groupId);
+
 		for (int i = 0; i < columnNames.length; i++) {
+
+			// マージされた行のServer Response列（2）とLength列（3）はスキップ
+			if (hasResponse && (i == 2 || i == 3)) {
+
+				continue;
+			}
 
 			if (row_data[i] == tableModel.getValueAt(row_index, i)) {
 
@@ -983,5 +1213,100 @@ public class GUIHistory implements PropertyChangeListener {
 
 	public void removeMenu(JMenuItem menuItem) {
 		menu.remove(menuItem);
+	}
+
+	/**
+	 * リクエストパケットIDに対応するレスポンスパケットIDを取得する
+	 * マージされた行の場合のみ有効
+	 * @param requestPacketId リクエストパケットID
+	 * @return レスポンスパケットID、存在しない場合は-1
+	 */
+	public int getResponsePacketIdForRequest(int requestPacketId) {
+		for (java.util.Map.Entry<Integer, Integer> entry : response_to_request_id.entrySet()) {
+			if (entry.getValue() == requestPacketId) {
+				return entry.getKey();
+			}
+		}
+		return -1;
+	}
+
+	/**
+	 * 選択された行がマージされた行（リクエスト+レスポンス）かどうかを判定
+	 * @return マージされた行の場合true
+	 */
+	public boolean isSelectedRowMerged() {
+		int packetId = getSelectedPacketId();
+		return getResponsePacketIdForRequest(packetId) != -1;
+	}
+
+	/**
+	 * パケットに対して自動色付けルールを適用する
+	 * @param packet 対象のパケット
+	 */
+	private void applyAutoColorRule(Packet packet) {
+		try {
+			// リクエストパケットのみ対象（レスポンスは同じグループのリクエストの色を継承）
+			if (packet.getDirection() != Packet.Direction.CLIENT) {
+				return;
+			}
+
+			// 既に色が設定されている場合はスキップ
+			if (packet.getColor() != null && !packet.getColor().isEmpty()) {
+				return;
+			}
+
+			// デコードされたデータからURLを取得
+			byte[] data = packet.getDecodedData();
+			if (data == null || data.length == 0) {
+				return;
+			}
+
+			String endpoint;
+			try {
+				Http http = Http.create(data);
+				endpoint = http.getURL(packet.getServerPort(), packet.getUseSSL());
+			} catch (Exception e) {
+				// HTTPパースに失敗した場合はサーバー名とポートで構成
+				endpoint = (packet.getUseSSL() ? "https://" : "http://")
+						+ packet.getServerName() + ":" + packet.getServerPort();
+			}
+
+			// 自動色付けルールをチェック
+			var matchingColor = AutoColorRules.getInstance().findMatchingColor(endpoint);
+			if (matchingColor.isPresent()) {
+				AutoColorRule.Color color = matchingColor.get();
+				String colorValue = color.getValue();
+
+				// パケットに色を設定して保存
+				packet.setColor(colorValue);
+				packets.update(packet);
+
+				// colorManagerにも追加
+				Color awtColor = getAwtColorFromColorValue(colorValue);
+				if (awtColor != null) {
+					colorManager.add(packet.getId(), awtColor);
+				}
+			}
+		} catch (Exception e) {
+			errWithStackTrace(e);
+		}
+	}
+
+	/**
+	 * 色の文字列値からAWT Colorオブジェクトを取得
+	 * @param colorValue 色の文字列値（"green", "brown", "yellow"）
+	 * @return 対応するColor、不明な場合はnull
+	 */
+	private Color getAwtColorFromColorValue(String colorValue) {
+		switch (colorValue) {
+			case "green":
+				return packetColorGreen;
+			case "brown":
+				return packetColorBrown;
+			case "yellow":
+				return packetColorYellow;
+			default:
+				return null;
+		}
 	}
 }

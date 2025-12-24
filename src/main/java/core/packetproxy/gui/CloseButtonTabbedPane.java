@@ -65,7 +65,9 @@ public class CloseButtonTabbedPane extends JTabbedPane {
 				button.setIcon(icon);
 			}
 		});
+		main_panel.add(javax.swing.Box.createHorizontalStrut(8));
 		main_panel.add(label);
+		main_panel.add(javax.swing.Box.createHorizontalStrut(8));
 		main_panel.add(button);
 		super.addTab(null, content);
 		setTabComponentAt(getTabCount() - 1, main_panel);

@@ -50,7 +50,9 @@ public enum PropertyChangeEventType {
 
 	EXTENSIONS("extensions"),
 
-	FORWARD_PORTS("forwardPorts");
+	FORWARD_PORTS("forwardPorts"),
+
+	AUTO_COLOR_RULES("autoColorRules");
 
 	private final String value;
 

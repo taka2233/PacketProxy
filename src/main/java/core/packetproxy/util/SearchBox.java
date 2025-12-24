@@ -201,30 +201,71 @@ public class SearchBox extends JPanel {
 		javax.swing.text.StyledDocument document = baseText.getStyledDocument();
 		String str = baseText.getText();
 		if (str.length() > 1000000) {
-
-			// System.err.println("[Warning] coloringHTTPText: too long string. Skipping
-			// Highlight");
 			return;
 		}
 
+		// HTTPボディの開始位置を検出
+		int bodyStart = findHttpBodyStart(str);
+
+		// URLクエリパラメータの範囲を検出（リクエストラインの?以降から空白まで）
+		int queryStart = -1;
+		int queryEnd = -1;
+		int firstLineEnd = str.indexOf('\n');
+		if (firstLineEnd > 0) {
+			String firstLine = str.substring(0, firstLineEnd);
+			int questionMark = firstLine.indexOf('?');
+			if (questionMark >= 0) {
+				queryStart = questionMark + 1;
+				// クエリパラメータの終端を探す（空白またはHTTP/x.xの前）
+				int spaceAfterQuery = firstLine.indexOf(' ', questionMark);
+				queryEnd = (spaceAfterQuery > 0) ? spaceAfterQuery : firstLineEnd;
+			}
+		}
+
 		javax.swing.text.MutableAttributeSet attributes = new javax.swing.text.SimpleAttributeSet();
-		// 色を変える
 		com.google.re2j.Pattern pattern = com.google.re2j.Pattern
 				.compile("([a-zA-Z0-9%.,/*_+-]+)=([a-zA-Z0-9%.,/*_+-]+)", com.google.re2j.Pattern.MULTILINE);
 		com.google.re2j.Matcher matcher = pattern.matcher(str);
+
 		while (matcher.find()) {
+			int matchStart = matcher.start();
+
+			// マッチがURLクエリパラメータ範囲内またはHTTPボディ内にあるかチェック
+			boolean isInQueryParams = (queryStart >= 0 && matchStart >= queryStart && matchStart < queryEnd);
+			boolean isInBody = (bodyStart >= 0 && matchStart >= bodyStart);
+
+			if (!isInQueryParams && !isInBody) {
+				// HTTPヘッダー部分のマッチはスキップ
+				continue;
+			}
 
 			String key = matcher.group(1);
 			String value = matcher.group(2);
-			int key_start = matcher.start();
+			int key_start = matchStart;
 			int value_start = key_start + key.length() + 1;
 			javax.swing.text.StyleConstants.setForeground(attributes, java.awt.Color.blue);
 			document.setCharacterAttributes(key_start, key.length(), attributes, false);
 			javax.swing.text.StyleConstants.setForeground(attributes, java.awt.Color.red);
 			document.setCharacterAttributes(value_start, value.length(), attributes, false);
-			// System.out.println("key = " + key);
-			// System.out.println("value = " + value);
 		}
+	}
+
+	/**
+	 * HTTPボディの開始位置を検出する
+	 * @return ボディの開始位置、見つからない場合は-1
+	 */
+	private int findHttpBodyStart(String str) {
+		// \r\n\r\n を優先的に検索
+		int idx = str.indexOf("\r\n\r\n");
+		if (idx >= 0) {
+			return idx + 4;
+		}
+		// \n\n を検索
+		idx = str.indexOf("\n\n");
+		if (idx >= 0) {
+			return idx + 2;
+		}
+		return -1;
 	}
 
 	private void updateAll() {

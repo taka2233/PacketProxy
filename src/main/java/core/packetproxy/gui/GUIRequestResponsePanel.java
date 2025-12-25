@@ -18,6 +18,7 @@ package packetproxy.gui;
 import static packetproxy.util.Logging.errWithStackTrace;
 
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
@@ -39,10 +40,15 @@ import packetproxy.model.Packet;
 /**
  * リクエストとレスポンスを左右に並べて表示するパネル
  * 各パネルにReceived Packet, Decoded, Modified, Encoded, Allのタブを持つ
+ * HTTP以外の通信では単一パケット表示モードに切り替わる
  */
 public class GUIRequestResponsePanel {
 
+	private static final String SPLIT_VIEW = "SPLIT_VIEW";
+	private static final String SINGLE_VIEW = "SINGLE_VIEW";
+
 	private JPanel main_panel;
+	private CardLayout cardLayout;
 	private JSplitPane split_pane;
 
 	// Request側
@@ -71,9 +77,24 @@ public class GUIRequestResponsePanel {
 	private RawTextPane response_all_modified;
 	private RawTextPane response_all_sent;
 
+	// 単一パケット表示用
+	private JPanel single_packet_panel;
+	private JTabbedPane single_tabs;
+	private TabSet single_decoded_tabs;
+	private GUIData single_received_panel;
+	private GUIData single_modified_panel;
+	private GUIData single_sent_panel;
+	private JComponent single_all_panel;
+	private RawTextPane single_all_received;
+	private RawTextPane single_all_decoded;
+	private RawTextPane single_all_modified;
+	private RawTextPane single_all_sent;
+
 	// 現在表示中のパケット
 	private Packet showing_request_packet;
 	private Packet showing_response_packet;
+	private Packet showing_single_packet;
+	private String currentView = SPLIT_VIEW;
 
 	private javax.swing.JFrame owner;
 
@@ -82,9 +103,10 @@ public class GUIRequestResponsePanel {
 	}
 
 	public JComponent createPanel() throws Exception {
-		main_panel = new JPanel();
-		main_panel.setLayout(new BorderLayout());
+		cardLayout = new CardLayout();
+		main_panel = new JPanel(cardLayout);
 
+		// === 分割ビュー（HTTP用）===
 		// リクエストパネルの作成
 		request_panel = createRequestPanel();
 
@@ -94,11 +116,15 @@ public class GUIRequestResponsePanel {
 		// 左右に分割
 		split_pane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, request_panel, response_panel);
 		split_pane.setResizeWeight(0.5);
-		split_pane.setOneTouchExpandable(true);
 		split_pane.setContinuousLayout(true);
 		split_pane.setDividerSize(8);
 
-		main_panel.add(split_pane, BorderLayout.CENTER);
+		main_panel.add(split_pane, SPLIT_VIEW);
+
+		// === 単一パケットビュー（非HTTP用）===
+		single_packet_panel = createSinglePacketPanel();
+		main_panel.add(single_packet_panel, SINGLE_VIEW);
+
 		return main_panel;
 	}
 
@@ -198,6 +224,64 @@ public class GUIRequestResponsePanel {
 		return panel;
 	}
 
+	private JPanel createSinglePacketPanel() throws Exception {
+		JPanel panel = new JPanel();
+		panel.setLayout(new BorderLayout());
+		panel.setBorder(BorderFactory.createTitledBorder(
+				BorderFactory.createLineBorder(new Color(0x66, 0x66, 0x99), 2),
+				"Streaming Packet",
+				TitledBorder.LEFT,
+				TitledBorder.TOP,
+				null,
+				new Color(0x66, 0x66, 0x99)));
+
+		// タブの作成
+		single_tabs = new JTabbedPane();
+
+		// Decoded タブ（メインのタブ）
+		single_decoded_tabs = new TabSet(true, false);
+		single_tabs.addTab("Decoded", single_decoded_tabs.getTabPanel());
+
+		// Received Packet タブ
+		single_received_panel = new GUIData(owner);
+		single_tabs.addTab("Received Packet", single_received_panel.createPanel());
+
+		// Modified タブ
+		single_modified_panel = new GUIData(owner);
+		single_tabs.addTab("Modified", single_modified_panel.createPanel());
+
+		// Encoded (Sent Packet) タブ
+		single_sent_panel = new GUIData(owner);
+		single_tabs.addTab("Encoded (Sent Packet)", single_sent_panel.createPanel());
+
+		// All タブ
+		single_all_panel = createAllPanelForSingle();
+		single_tabs.addTab("All", single_all_panel);
+
+		// タブ変更リスナー
+		single_tabs.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				updateSinglePacketPanel();
+			}
+		});
+
+		panel.add(single_tabs, BorderLayout.CENTER);
+		return panel;
+	}
+
+	private JComponent createAllPanelForSingle() throws Exception {
+		JPanel panel = new JPanel();
+		panel.setLayout(new GridLayout(1, 4));
+
+		single_all_received = createTextPaneForAll(panel, I18nString.get("Received"));
+		single_all_decoded = createTextPaneForAll(panel, I18nString.get("Decoded"));
+		single_all_modified = createTextPaneForAll(panel, I18nString.get("Modified"));
+		single_all_sent = createTextPaneForAll(panel, I18nString.get("Encoded"));
+
+		return panel;
+	}
+
 	private JComponent createAllPanel(boolean isRequest) throws Exception {
 		JPanel panel = new JPanel();
 		panel.setLayout(new GridLayout(1, 4));
@@ -248,6 +332,42 @@ public class GUIRequestResponsePanel {
 	public void setResponsePacket(Packet packet) {
 		showing_response_packet = packet;
 		updateResponsePanel();
+	}
+
+	/**
+	 * 単一パケット表示モード用：パケットを設定
+	 * Streaming通信で使用
+	 */
+	public void setSinglePacket(Packet packet) {
+		showing_single_packet = packet;
+		switchToSingleView();
+		updateSinglePacketPanel();
+	}
+
+	/**
+	 * リクエスト/レスポンス分割表示モード用：両方のパケットを設定
+	 * HTTP通信で使用
+	 */
+	public void setPackets(Packet requestPacket, Packet responsePacket) {
+		showing_request_packet = requestPacket;
+		showing_response_packet = responsePacket;
+		switchToSplitView();
+		updateRequestPanel();
+		updateResponsePanel();
+	}
+
+	private void switchToSplitView() {
+		if (!SPLIT_VIEW.equals(currentView)) {
+			currentView = SPLIT_VIEW;
+			cardLayout.show(main_panel, SPLIT_VIEW);
+		}
+	}
+
+	private void switchToSingleView() {
+		if (!SINGLE_VIEW.equals(currentView)) {
+			currentView = SINGLE_VIEW;
+			cardLayout.show(main_panel, SINGLE_VIEW);
+		}
 	}
 
 	private void updateRequestPanel() {
@@ -361,6 +481,64 @@ public class GUIRequestResponsePanel {
 			response_all_decoded.setData(new byte[]{}, true);
 			response_all_modified.setData(new byte[]{}, true);
 			response_all_sent.setData(new byte[]{}, true);
+		} catch (Exception e) {
+			errWithStackTrace(e);
+		}
+	}
+
+	private void updateSinglePacketPanel() {
+		if (showing_single_packet == null) {
+			clearSinglePacketPanel();
+			return;
+		}
+		try {
+			int selectedIndex = single_tabs.getSelectedIndex();
+			switch (selectedIndex) {
+				case 0: // Decoded
+					byte[] decodedData = showing_single_packet.getDecodedData();
+					if (decodedData == null || decodedData.length == 0) {
+						decodedData = showing_single_packet.getModifiedData();
+					}
+					if (decodedData == null) {
+						decodedData = new byte[]{};
+					}
+					single_decoded_tabs.setData(decodedData);
+					break;
+				case 1: // Received Packet
+					single_received_panel.setData(showing_single_packet.getReceivedData());
+					break;
+				case 2: // Modified
+					single_modified_panel.setData(showing_single_packet.getModifiedData());
+					break;
+				case 3: // Encoded (Sent Packet)
+					single_sent_panel.setData(showing_single_packet.getSentData());
+					break;
+				case 4: // All
+					single_all_received.setData(showing_single_packet.getReceivedData(), true);
+					single_all_received.setCaretPosition(0);
+					single_all_decoded.setData(showing_single_packet.getDecodedData(), true);
+					single_all_decoded.setCaretPosition(0);
+					single_all_modified.setData(showing_single_packet.getModifiedData(), true);
+					single_all_modified.setCaretPosition(0);
+					single_all_sent.setData(showing_single_packet.getSentData(), true);
+					single_all_sent.setCaretPosition(0);
+					break;
+			}
+		} catch (Exception e) {
+			errWithStackTrace(e);
+		}
+	}
+
+	private void clearSinglePacketPanel() {
+		try {
+			single_decoded_tabs.setData(new byte[]{});
+			single_received_panel.setData(new byte[]{});
+			single_modified_panel.setData(new byte[]{});
+			single_sent_panel.setData(new byte[]{});
+			single_all_received.setData(new byte[]{}, true);
+			single_all_decoded.setData(new byte[]{}, true);
+			single_all_modified.setData(new byte[]{}, true);
+			single_all_sent.setData(new byte[]{}, true);
 		} catch (Exception e) {
 			errWithStackTrace(e);
 		}

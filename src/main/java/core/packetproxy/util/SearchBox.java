@@ -32,6 +32,8 @@ import packetproxy.common.Range;
 @SuppressWarnings("serial")
 public class SearchBox extends JPanel {
 
+	private static final int MAX_TEXT_LENGTH_FOR_HIGHLIGHTING = 1_000_000;
+
 	private JTextPane baseText;
 	private Range emphasisArea = null;
 	private JTextField search_text;
@@ -138,10 +140,7 @@ public class SearchBox extends JPanel {
 		javax.swing.text.StyledDocument document = baseText.getStyledDocument();
 		String str = baseText.getText();
 		String search_string = search_text.getText();
-		if (str.length() > 1000000) {
-
-			// System.err.println("[Warning] coloringSearchText: too long string. Skipping
-			// Highlight");
+		if (str.length() > MAX_TEXT_LENGTH_FOR_HIGHLIGHTING) {
 			return -1;
 		}
 		if (str.isEmpty() || search_string.isEmpty()) {
@@ -196,11 +195,14 @@ public class SearchBox extends JPanel {
 		document.setCharacterAttributes(0, str.length(), attributes, false);
 	}
 
-	/** TODO HTTPの構造を解釈して、明らかにパラメータではない所を除外する */
+	/**
+	 * HTTPテキストのパラメータ部分（クエリパラメータとボディ）を色付けする。
+	 * HTTPヘッダー部分のkey=value形式はスキップする。
+	 */
 	public void coloringHTTPText() {
 		javax.swing.text.StyledDocument document = baseText.getStyledDocument();
 		String str = baseText.getText();
-		if (str.length() > 1000000) {
+		if (str.length() > MAX_TEXT_LENGTH_FOR_HIGHLIGHTING) {
 
 			// System.err.println("[Warning] coloringHTTPText: too long string. Skipping
 			// Highlight");

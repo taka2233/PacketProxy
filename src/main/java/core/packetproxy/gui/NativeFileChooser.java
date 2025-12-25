@@ -19,7 +19,6 @@ import java.awt.Component;
 import java.awt.FileDialog;
 import java.awt.Frame;
 import java.io.File;
-import java.io.FilenameFilter;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JFileChooser;
@@ -121,6 +120,7 @@ public class NativeFileChooser {
 		}
 	}
 
+<<<<<<< HEAD
 	/**
 	 * Show a save dialog.
 	 *
@@ -178,6 +178,18 @@ public class NativeFileChooser {
 		try {
 			Frame frame = getFrame(parent);
 			FileDialog dialog = new FileDialog(frame, dialogTitle != null ? dialogTitle : "Open", FileDialog.LOAD);
+=======
+    private int showNativeOpenDialog(Component parent) {
+        Frame frame = getFrame(parent);
+        FileDialog dialog = new FileDialog(frame, dialogTitle != null ? dialogTitle : "Open", FileDialog.LOAD);
+        
+        if (currentDirectory != null) {
+            dialog.setDirectory(currentDirectory.getAbsolutePath());
+        }
+
+        // Note: setFilenameFilter() does not work on macOS Finder.
+        // File filtering is not supported in native Mac file dialogs.
+>>>>>>> d93b064 (Request/Responseの並列表示の実装で循環依存があったので修正)
 
 			if (currentDirectory != null) {
 				dialog.setDirectory(currentDirectory.getAbsolutePath());

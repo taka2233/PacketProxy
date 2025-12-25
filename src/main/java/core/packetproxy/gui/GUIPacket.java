@@ -71,8 +71,8 @@ public class GUIPacket {
 			showing_packet = packet;
 			// マージされた行の場合、レスポンスパケットも取得
 			try {
-				GUIHistory history = GUIHistory.getInstance();
-				int responsePacketId = history.getResponsePacketIdForRequest(packet.getId());
+				PacketPairingService pairingService = PacketPairingService.getInstance();
+				int responsePacketId = pairingService.getResponsePacketIdForRequest(packet.getId());
 				if (responsePacketId != -1) {
 					showing_response_packet = Packets.getInstance().query(responsePacketId);
 				} else {

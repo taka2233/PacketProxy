@@ -33,6 +33,8 @@ public class PacketPairingService {
     private HashSet<Long> groupHasResponse;
     // レスポンスパケットIDとリクエストパケットIDのマッピング（マージされた行用）
     private Hashtable<Integer, Integer> responseToRequestId;
+    // グループIDごとのパケット数（3個以上でマージしない）
+    private Hashtable<Long, Integer> groupPacketCount;
 
     public static PacketPairingService getInstance() {
         if (instance == null) {
@@ -45,6 +47,7 @@ public class PacketPairingService {
         groupRow = new Hashtable<>();
         groupHasResponse = new HashSet<>();
         responseToRequestId = new Hashtable<>();
+        groupPacketCount = new Hashtable<>();
     }
 
     /**
@@ -54,6 +57,7 @@ public class PacketPairingService {
         groupRow.clear();
         groupHasResponse.clear();
         responseToRequestId.clear();
+        groupPacketCount.clear();
     }
 
     /**
@@ -149,6 +153,36 @@ public class PacketPairingService {
      */
     public boolean isMergedRow(int packetId) {
         return getResponsePacketIdForRequest(packetId) != -1;
+    }
+
+    /**
+     * グループのパケット数をインクリメントする
+     * @param groupId グループID
+     * @return インクリメント後のパケット数
+     */
+    public int incrementGroupPacketCount(long groupId) {
+        int count = groupPacketCount.getOrDefault(groupId, 0) + 1;
+        groupPacketCount.put(groupId, count);
+        return count;
+    }
+
+    /**
+     * グループのパケット数を取得する
+     * @param groupId グループID
+     * @return パケット数
+     */
+    public int getGroupPacketCount(long groupId) {
+        return groupPacketCount.getOrDefault(groupId, 0);
+    }
+
+    /**
+     * グループがマージ可能かどうかを判定する
+     * パケット数が2以下の場合のみマージ可能
+     * @param groupId グループID
+     * @return マージ可能な場合true
+     */
+    public boolean isGroupMergeable(long groupId) {
+        return getGroupPacketCount(groupId) <= 2;
     }
 }
 

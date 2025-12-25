@@ -698,8 +698,22 @@ public class GUIHistory implements PropertyChangeListener {
 				applyAutoColorRule(packet);
 			}
 
-			// レスポンスで、同じグループIDのリクエスト行が存在し、まだレスポンスがない場合はマージ
-			if (isResponse && groupId != 0 && pairingService.containsGroup(groupId) && !pairingService.hasResponse(groupId)) {
+			// グループIDが設定されている場合、パケット数をカウント
+			if (groupId != 0) {
+				pairingService.incrementGroupPacketCount(groupId);
+			}
+
+			// レスポンスをリクエスト行にマージする条件：
+			// - グループIDが設定されている
+			// - 同じグループのリクエスト行が存在する
+			// - まだレスポンスがマージされていない
+			// - グループのパケット数が2以下（3個以上はストリーミング等なのでマージしない）
+			boolean shouldMerge = isResponse && groupId != 0
+					&& pairingService.containsGroup(groupId)
+					&& !pairingService.hasResponse(groupId)
+					&& pairingService.isGroupMergeable(groupId);
+
+			if (shouldMerge) {
 
 				int rowIndex = pairingService.getRowForGroup(groupId);
 				int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
@@ -722,7 +736,7 @@ public class GUIHistory implements PropertyChangeListener {
 				int rowIndex = tableModel.getRowCount() - 1;
 				id_row.put(positiveValue, rowIndex);
 
-				// リクエストの場合はグループマッピングに追加
+				// リクエストでグループIDがある場合はグループマッピングに追加
 				if (!isResponse && groupId != 0) {
 
 					pairingService.registerGroupRow(groupId, rowIndex);
@@ -924,8 +938,18 @@ public class GUIHistory implements PropertyChangeListener {
 			long groupId = packet.getGroup();
 			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
 
-			// レスポンスで、同じグループIDのリクエスト行が存在し、まだレスポンスがない場合はマージ
-			if (isResponse && groupId != 0 && pairingService.containsGroup(groupId) && !pairingService.hasResponse(groupId)) {
+			// グループIDが設定されている場合、パケット数をカウント
+			if (groupId != 0) {
+				pairingService.incrementGroupPacketCount(groupId);
+			}
+
+			// レスポンスをリクエスト行にマージする条件
+			boolean shouldMerge = isResponse && groupId != 0
+					&& pairingService.containsGroup(groupId)
+					&& !pairingService.hasResponse(groupId)
+					&& pairingService.isGroupMergeable(groupId);
+
+			if (shouldMerge) {
 
 				int rowIndex = pairingService.getRowForGroup(groupId);
 				int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
@@ -948,7 +972,7 @@ public class GUIHistory implements PropertyChangeListener {
 				int rowIndex = tableModel.getRowCount() - 1;
 				id_row.put(packet.getId(), rowIndex);
 
-				// リクエストの場合はグループマッピングに追加
+				// リクエストでグループIDがある場合はグループマッピングに追加
 				if (!isResponse && groupId != 0) {
 
 					pairingService.registerGroupRow(groupId, rowIndex);
@@ -972,8 +996,18 @@ public class GUIHistory implements PropertyChangeListener {
 			long groupId = packet.getGroup();
 			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
 
-			// レスポンスで、同じグループIDのリクエスト行が存在し、まだレスポンスがない場合はマージ
-			if (isResponse && groupId != 0 && pairingService.containsGroup(groupId) && !pairingService.hasResponse(groupId)) {
+			// グループIDが設定されている場合、パケット数をカウント
+			if (groupId != 0) {
+				pairingService.incrementGroupPacketCount(groupId);
+			}
+
+			// レスポンスをリクエスト行にマージする条件
+			boolean shouldMerge = isResponse && groupId != 0
+					&& pairingService.containsGroup(groupId)
+					&& !pairingService.hasResponse(groupId)
+					&& pairingService.isGroupMergeable(groupId);
+
+			if (shouldMerge) {
 
 				int rowIndex = pairingService.getRowForGroup(groupId);
 				int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
@@ -990,7 +1024,7 @@ public class GUIHistory implements PropertyChangeListener {
 				int rowIndex = tableModel.getRowCount() - 1;
 				id_row.put(id, rowIndex);
 
-				// リクエストの場合はグループマッピングに追加
+				// リクエストでグループIDがある場合はグループマッピングに追加
 				if (!isResponse && groupId != 0) {
 
 					pairingService.registerGroupRow(groupId, rowIndex);
@@ -1296,4 +1330,5 @@ public class GUIHistory implements PropertyChangeListener {
 				return null;
 		}
 	}
+
 }

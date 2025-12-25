@@ -19,7 +19,6 @@ import java.awt.Component;
 import java.awt.FileDialog;
 import java.awt.Frame;
 import java.io.File;
-import java.io.FilenameFilter;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JFileChooser;
@@ -128,26 +127,6 @@ public class NativeFileChooser {
         return (Frame) SwingUtilities.getAncestorOfClass(Frame.class, parent);
     }
 
-    private FilenameFilter createFilenameFilter() {
-        if (fileFilters.isEmpty()) {
-            return null;
-        }
-        return (dir, name) -> {
-            if (acceptAllFileFilterUsed) {
-                return true;
-            }
-            String lowerName = name.toLowerCase();
-            for (String[] extensions : fileFilters) {
-                for (String ext : extensions) {
-                    if (lowerName.endsWith("." + ext.toLowerCase())) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        };
-    }
-
     private int showNativeOpenDialog(Component parent) {
         Frame frame = getFrame(parent);
         FileDialog dialog = new FileDialog(frame, dialogTitle != null ? dialogTitle : "Open", FileDialog.LOAD);
@@ -156,24 +135,8 @@ public class NativeFileChooser {
             dialog.setDirectory(currentDirectory.getAbsolutePath());
         }
 
-        FilenameFilter filter = createFilenameFilter();
-        if (filter != null && !acceptAllFileFilterUsed) {
-            dialog.setFilenameFilter(filter);
-        }
-
-        // On Mac, we can set allowed file types for better native integration
-        if (!fileFilters.isEmpty()) {
-            StringBuilder allowedExtensions = new StringBuilder();
-            for (String[] extensions : fileFilters) {
-                for (String ext : extensions) {
-                    if (allowedExtensions.length() > 0) {
-                        allowedExtensions.append(";");
-                    }
-                    allowedExtensions.append("*.").append(ext);
-                }
-            }
-            dialog.setFile(allowedExtensions.toString());
-        }
+        // Note: setFilenameFilter() does not work on macOS Finder.
+        // File filtering is not supported in native Mac file dialogs.
 
         dialog.setVisible(true);
 

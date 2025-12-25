@@ -32,6 +32,8 @@ import packetproxy.common.Range;
 @SuppressWarnings("serial")
 public class SearchBox extends JPanel {
 
+	private static final int MAX_TEXT_LENGTH_FOR_HIGHLIGHTING = 1_000_000;
+
 	private JTextPane baseText;
 	private Range emphasisArea = null;
 	private JTextField search_text;
@@ -138,10 +140,7 @@ public class SearchBox extends JPanel {
 		javax.swing.text.StyledDocument document = baseText.getStyledDocument();
 		String str = baseText.getText();
 		String search_string = search_text.getText();
-		if (str.length() > 1000000) {
-
-			// System.err.println("[Warning] coloringSearchText: too long string. Skipping
-			// Highlight");
+		if (str.length() > MAX_TEXT_LENGTH_FOR_HIGHLIGHTING) {
 			return -1;
 		}
 		if (str.isEmpty() || search_string.isEmpty()) {
@@ -196,11 +195,14 @@ public class SearchBox extends JPanel {
 		document.setCharacterAttributes(0, str.length(), attributes, false);
 	}
 
-	/** TODO HTTPの構造を解釈して、明らかにパラメータではない所を除外する */
+	/**
+	 * HTTPテキストのパラメータ部分（クエリパラメータとボディ）を色付けする。
+	 * HTTPヘッダー部分のkey=value形式はスキップする。
+	 */
 	public void coloringHTTPText() {
 		javax.swing.text.StyledDocument document = baseText.getStyledDocument();
 		String str = baseText.getText();
-		if (str.length() > 1000000) {
+		if (str.length() > MAX_TEXT_LENGTH_FOR_HIGHLIGHTING) {
 			return;
 		}
 
@@ -210,7 +212,7 @@ public class SearchBox extends JPanel {
 		// URLクエリパラメータの範囲を検出（リクエストラインの?以降から空白まで）
 		int queryStart = -1;
 		int queryEnd = -1;
-		int firstLineEnd = str.indexOf('\n');
+		int firstLineEnd = findFirstLineEnd(str);
 		if (firstLineEnd > 0) {
 			String firstLine = str.substring(0, firstLineEnd);
 			int questionMark = firstLine.indexOf('?');
@@ -241,17 +243,18 @@ public class SearchBox extends JPanel {
 
 			String key = matcher.group(1);
 			String value = matcher.group(2);
-			int key_start = matchStart;
-			int value_start = key_start + key.length() + 1;
+			int keyStart = matchStart;
+			int valueStart = keyStart + key.length() + 1;
 			javax.swing.text.StyleConstants.setForeground(attributes, java.awt.Color.blue);
-			document.setCharacterAttributes(key_start, key.length(), attributes, false);
+			document.setCharacterAttributes(keyStart, key.length(), attributes, false);
 			javax.swing.text.StyleConstants.setForeground(attributes, java.awt.Color.red);
-			document.setCharacterAttributes(value_start, value.length(), attributes, false);
+			document.setCharacterAttributes(valueStart, value.length(), attributes, false);
 		}
 	}
 
 	/**
 	 * HTTPボディの開始位置を検出する
+	 * @param str HTTPテキスト
 	 * @return ボディの開始位置、見つからない場合は-1
 	 */
 	private int findHttpBodyStart(String str) {
@@ -266,6 +269,20 @@ public class SearchBox extends JPanel {
 			return idx + 2;
 		}
 		return -1;
+	}
+
+	/**
+	 * 最初の行の終端位置を検出する（\r\nと\nの両方に対応）
+	 * @param str HTTPテキスト
+	 * @return 最初の行の終端位置、見つからない場合は-1
+	 */
+	private int findFirstLineEnd(String str) {
+		int crlfIdx = str.indexOf("\r\n");
+		if (crlfIdx >= 0) {
+			return crlfIdx;
+		}
+		int lfIdx = str.indexOf('\n');
+		return (lfIdx >= 0) ? lfIdx : -1;
 	}
 
 	private void updateAll() {

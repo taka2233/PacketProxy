@@ -66,30 +66,40 @@ public class GUIPacket {
 		if (showing_packet != null && showing_packet.getId() == packet.getId()) {
 
 			return;
-		} else {
+		}
 
+		// パケットのペアリング状態から表示モードを判断
+		PacketPairingService pairingService = PacketPairingService.getInstance();
+		int responsePacketId = pairingService.getResponsePacketIdForRequest(packet.getId());
+
+		if (responsePacketId != -1) {
+			// マージされている → リクエスト/レスポンス分割表示
 			showing_packet = packet;
-			// マージされた行の場合、レスポンスパケットも取得
 			try {
-				PacketPairingService pairingService = PacketPairingService.getInstance();
-				int responsePacketId = pairingService.getResponsePacketIdForRequest(packet.getId());
-				if (responsePacketId != -1) {
-					showing_response_packet = Packets.getInstance().query(responsePacketId);
-				} else {
-					// リクエストパケットがレスポンスパケットの場合、またはマージされていない場合
-					if (packet.getDirection() == Packet.Direction.SERVER) {
-						showing_response_packet = packet;
-						showing_packet = null;
-					} else {
-						showing_response_packet = null;
-					}
-				}
+				showing_response_packet = Packets.getInstance().query(responsePacketId);
 			} catch (Exception e) {
 				errWithStackTrace(e);
 				showing_response_packet = null;
 			}
+			request_response_panel.setPackets(showing_packet, showing_response_packet);
+		} else if (pairingService.containsResponsePairing(packet.getId())) {
+			// このパケット自体がレスポンスとしてマージされている → リクエストを取得して分割表示
+			int requestPacketId = pairingService.getRequestIdForResponse(packet.getId());
+			try {
+				showing_packet = Packets.getInstance().query(requestPacketId);
+				showing_response_packet = packet;
+			} catch (Exception e) {
+				errWithStackTrace(e);
+				showing_packet = null;
+				showing_response_packet = packet;
+			}
+			request_response_panel.setPackets(showing_packet, showing_response_packet);
+		} else {
+			// マージされていない → 単一パケット表示
+			showing_packet = packet;
+			showing_response_packet = null;
+			request_response_panel.setSinglePacket(packet);
 		}
-		update();
 	}
 
 	public Packet getPacket() {

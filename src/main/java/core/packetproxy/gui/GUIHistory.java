@@ -418,23 +418,8 @@ public class GUIHistory implements PropertyChangeListener {
 
 			table.getColumn(columnNames[i]).setPreferredWidth(columnWidth[i]);
 		}
-		// Set header alignment to left with border and padding
-		DefaultTableCellRenderer headerRenderer = new DefaultTableCellRenderer() {
-			@Override
-			public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
-					boolean hasFocus, int row, int column) {
-				Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-				setBorder(BorderFactory.createCompoundBorder(
-						BorderFactory.createMatteBorder(0, 0, 1, 1, Color.LIGHT_GRAY),
-						BorderFactory.createEmptyBorder(2, 5, 2, 5) // top, left, bottom, right padding
-				));
-				return c;
-			}
-		};
-		headerRenderer.setHorizontalAlignment(SwingConstants.LEFT);
-		for (int i = 0; i < columnNames.length; i++) {
-			table.getColumnModel().getColumn(i).setHeaderRenderer(headerRenderer);
-		}
+		// Set header alignment to left with border and padding, while preserving sort icons on the right edge
+		TableHeaderStyle.apply(table, columnNames.length);
 		((JComponent) table.getDefaultRenderer(Boolean.class)).setOpaque(true);
 		table.getSelectionModel().addListSelectionListener(new javax.swing.event.ListSelectionListener() {
 

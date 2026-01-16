@@ -36,6 +36,7 @@ import java.util.jar.JarFile;
 import javax.swing.JOptionPane;
 import packetproxy.extensions.randomness.RandomnessExtension;
 import packetproxy.extensions.samplehttp.SampleEncoders;
+import packetproxy.extensions.securityheaders.SecurityHeadersExtension;
 import packetproxy.model.Database.DatabaseMessage;
 
 public class Extensions implements PropertyChangeListener {
@@ -56,6 +57,7 @@ public class Extensions implements PropertyChangeListener {
 		{
 			put((new RandomnessExtension()).getName(), RandomnessExtension.class);
 			put((new SampleEncoders()).getName(), SampleEncoders.class);
+			put((new SecurityHeadersExtension()).getName(), SecurityHeadersExtension.class);
 		}
 	};
 

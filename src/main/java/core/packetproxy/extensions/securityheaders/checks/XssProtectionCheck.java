@@ -49,7 +49,7 @@ public class XssProtectionCheck implements SecurityCheck {
 			return SecurityCheckResult.ok("nosniff", "nosniff");
 		}
 
-		return SecurityCheckResult.fail("Missing", "");
+		return SecurityCheckResult.fail("(none)", "");
 	}
 
 	@Override

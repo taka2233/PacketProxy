@@ -48,7 +48,7 @@ public class HstsCheck implements SecurityCheck {
 		if (!hsts.isEmpty()) {
 			return SecurityCheckResult.ok("Strict-Transport-Security: " + hsts, hsts);
 		} else {
-			return SecurityCheckResult.fail("Missing", "");
+			return SecurityCheckResult.fail("(none)", "");
 		}
 	}
 

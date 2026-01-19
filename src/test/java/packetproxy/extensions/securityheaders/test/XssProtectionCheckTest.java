@@ -47,7 +47,7 @@ public class XssProtectionCheckTest {
 		SecurityCheckResult result = check.check(header, context);
 
 		assertTrue(result.isFail());
-		assertEquals("Missing", result.getDisplayValue());
+		assertEquals("(none)", result.getDisplayValue());
 	}
 
 	@Test

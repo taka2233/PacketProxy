@@ -66,7 +66,7 @@ public class CspCheck implements SecurityCheck {
 		}
 
 		if (csp.isEmpty()) {
-			return SecurityCheckResult.fail("Missing", "");
+			return SecurityCheckResult.fail("(none)", "");
 		}
 
 		return SecurityCheckResult.fail(csp, csp);

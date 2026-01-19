@@ -44,7 +44,7 @@ public class CspCheckTest {
 		SecurityCheckResult result = check.check(header, context);
 
 		assertTrue(result.isFail());
-		assertEquals("Missing", result.getDisplayValue());
+		assertEquals("(none)", result.getDisplayValue());
 	}
 
 	// ===== CSP without frame-ancestors =====
@@ -82,7 +82,7 @@ public class CspCheckTest {
 		SecurityCheckResult result = check.check(header, context);
 
 		assertTrue(result.isFail());
-		assertEquals("Missing", result.getDisplayValue());
+		assertEquals("(none)", result.getDisplayValue());
 	}
 
 	@Test

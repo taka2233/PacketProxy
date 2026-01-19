@@ -100,6 +100,7 @@ public class GUIMain extends JFrame implements PropertyChangeListener {
 	private GUIMain(String title) {
 		try {
 
+			setIcon();
 			gui_history = initProjectAndHistory();
 			setLookandFeel();
 			setTitle(title);
@@ -158,6 +159,11 @@ public class GUIMain extends JFrame implements PropertyChangeListener {
 		}
 	}
 
+	private void setIcon() throws Exception {
+		setIconForWindows();
+		addDockIconForMac();
+	}
+
 	private GUIHistory initProjectAndHistory() throws Exception {
 		var chooser = new GUIProjectChooserDialog(this);
 		var restore = chooser.chooseAndSetup();
@@ -195,10 +201,8 @@ public class GUIMain extends JFrame implements PropertyChangeListener {
 		// スクロールバーの幅を太くする
 		UIManager.put("ScrollBar.width", 15);
 
-		setIconForWindows();
 		addShortcutForWindows();
 		addShortcutForMac();
-		addDockIconForMac();
 	}
 
 	/** Windowsにアイコンを表示する */

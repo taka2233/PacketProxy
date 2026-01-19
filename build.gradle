@@ -255,7 +255,10 @@ sourceSets {
   }
   test {
     java {
-      def list = ['src/test/java']
+      def list = [
+        'src/test/java',
+        'src/test/kotlin'
+      ]
       // load additional dena tests if it exists
       ['dena/', 'denaN/', 'denaL/'].each { def dir ->
         def srcs = file(dir + 'tests.gradle')

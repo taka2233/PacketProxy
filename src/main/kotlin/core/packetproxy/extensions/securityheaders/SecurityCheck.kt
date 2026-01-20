@@ -29,7 +29,11 @@ interface SecurityCheck {
   val columnName: String
 
   /** Error message when this check fails */
-  val missingMessage: String
+  val failMessage: String
+
+  /** Warning message when this check warns. Defaults to failMessage if not overridden. */
+  val warnMessage: String
+    get() = failMessage
 
   /**
    * Perform the security check

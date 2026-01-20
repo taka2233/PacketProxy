@@ -10,62 +10,50 @@ PacketProxy用のセキュリティヘッダー分析拡張機能です。HTTP�
 
 `packetproxy.extensions.securityheaders.checks` パッケージ内に、`SecurityCheck` インターフェースを実装した新しいクラスを作成します。
 
-実装が必要なメソッド：
+実装が必要なメソッド・プロパティ：
 
-* **getName()**: チェックの表示名（Issuesタブで使用）
-* **getColumnName()**: 結果テーブルのカラム名
-* **getMissingMessage()**: チェック失敗時のエラーメッセージ
-* **matchesHeaderLine(String headerLine)**: このチェックが対象とするヘッダー行かどうかを判定（小文字で判定）
-* **check(HttpHeader header, Map<String, Object> context)**: チェック処理の本体
+* **name**: チェックの表示名（Issuesタブで使用）
+* **columnName**: 結果テーブルのカラム名
+* **failMessage**: チェック失敗時のエラーメッセージ
+* **warnMessage**: チェック警告時の警告メッセージ（オプション、デフォルトでは`failMessage`が使用される）
+* **matchesHeaderLine(headerLine: String)**: このチェックが対象とするヘッダー行かどうかを判定（小文字で判定）
+* **check(header: HttpHeader, context: MutableMap<String, Any>)**: チェック処理の本体
   * 戻り値として `SecurityCheckResult.ok()`, `.warn()`, `.fail()` を返します。
 
-オプションで以下のメソッドをオーバーライドして、結果表示のハイライトをカスタマイズできます：
+オプションで以下のメソッド・プロパティをオーバーライドして、結果表示のハイライトをカスタマイズできます：
 
-* **getGreenPatterns()**: 安全な設定を示す文字列パターン（リスト）
-* **getYellowPatterns()**: 注意が必要な設定を示す文字列パターン（リスト）
-* **getRedPatterns()**: 危険な設定を示す文字列パターン（リスト）
+* **greenPatterns**: 安全な設定を示す文字列パターン
+* **yellowPatterns**: 注意が必要な設定を示す文字列パターン
+* **redPatterns**: 危険な設定を示す文字列パターン
 
 実装例：
 
-```java
-package packetproxy.extensions.securityheaders.checks;
+```kotlin
+package packetproxy.extensions.securityheaders.checks
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import packetproxy.extensions.securityheaders.SecurityCheck;
-import packetproxy.extensions.securityheaders.SecurityCheckResult;
-import packetproxy.http.HttpHeader;
+import packetproxy.extensions.securityheaders.SecurityCheck
+import packetproxy.extensions.securityheaders.SecurityCheckResult
+import packetproxy.http.HttpHeader
 
-public class MyCustomCheck implements SecurityCheck {
+class MyCustomCheck : SecurityCheck {
 
-    @Override
-    public String getName() {
-        return "My Check";
+    override val name: String = "My Check"
+    override val columnName: String = "MyCheck"
+    override val failMessage: String = "My Check header is missing"
+    override val warnMessage: String = "My Check header has potential issues"
+
+    override fun matchesHeaderLine(headerLine: String): Boolean {
+        return headerLine.startsWith("my-header:")
     }
 
-    @Override
-    public String getColumnName() {
-        return "MyCheck";
-    }
-
-    @Override
-    public String getMissingMessage() {
-        return "My Check header is missing";
-    }
-
-    @Override
-    public boolean matchesHeaderLine(String headerLine) {
-        return headerLine.startsWith("my-header:");
-    }
-
-    @Override
-    public SecurityCheckResult check(HttpHeader header, Map<String, Object> context) {
-        String value = header.getValue("My-Header").orElse("");
-        if (value.equals("secure-value")) {
-            return SecurityCheckResult.ok(value, value);
+    override fun check(header: HttpHeader, context: MutableMap<String, Any>): SecurityCheckResult {
+        val value = header.getValue("My-Header").orElse("")
+        return when {
+            value == "secure-value" -> SecurityCheckResult.ok(value, value)
+            value == "insecure-value" -> SecurityCheckResult.fail("Invalid value", value)
+            value.isNotEmpty() -> SecurityCheckResult.warn(value, value)
+            else -> SecurityCheckResult.fail("Missing header", "")
         }
-        return SecurityCheckResult.fail("Invalid value", value);
     }
 }
 ```
@@ -74,13 +62,14 @@ public class MyCustomCheck implements SecurityCheck {
 
 `packetproxy.extensions.securityheaders.SecurityHeadersExtension` クラスの `SECURITY_CHECKS` リストに、作成したクラスのインスタンスを追加します。
 
-```java
-private static final List<SecurityCheck> SECURITY_CHECKS = Arrays.asList(
-    new CspCheck(),
-    new XssProtectionCheck(),
+```kotlin
+private val SECURITY_CHECKS =
+  listOf(
+    CspCheck(),
+    XssProtectionCheck(),
     // ...
-    new MyCustomCheck() // ここに追加
-);
+    MyCustomCheck(), 
+  )
 ```
 
 ### 3. ビルドと実行

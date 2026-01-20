@@ -235,7 +235,12 @@ class CorsCheckTest {
   }
 
   @Test
-  fun testGetMissingMessage() {
-    assertEquals("Potential CORS misconfiguration (wildcard or reflection)", check.missingMessage)
+  fun testGetFailMessage() {
+    assertEquals("CORS wildcard (*) allows all origins", check.failMessage)
+  }
+
+  @Test
+  fun testGetWarnMessage() {
+    assertEquals("Potential CORS Origin reflection vulnerability", check.warnMessage)
   }
 }

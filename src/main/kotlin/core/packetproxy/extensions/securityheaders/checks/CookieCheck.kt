@@ -33,7 +33,7 @@ class CookieCheck : SecurityCheck {
 
   override val name: String = "Cookies"
   override val columnName: String = "Cookies"
-  override val missingMessage: String = "Set-Cookie is missing 'Secure' flag"
+  override val failMessage: String = "Set-Cookie is missing 'Secure' flag"
   override val greenPatterns: List<String> = listOf("set-cookie:", "secure")
 
   override fun check(header: HttpHeader, context: MutableMap<String, Any>): SecurityCheckResult {

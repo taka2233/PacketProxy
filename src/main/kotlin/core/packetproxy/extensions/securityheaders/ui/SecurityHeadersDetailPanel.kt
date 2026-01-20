@@ -216,12 +216,12 @@ class SecurityHeadersDetailPanel(private val securityChecks: List<SecurityCheck>
       }
       result.isWarn -> {
         doc.insertString(doc.length, "WARNING\n", textStyles.yellow)
-        doc.insertString(doc.length, "  ${check.missingMessage}\n", textStyles.yellow)
+        doc.insertString(doc.length, "  ${check.warnMessage}\n", textStyles.yellow)
         doc.insertString(doc.length, "  Current: ${result.displayValue}\n\n", textStyles.black)
       }
       else -> {
         doc.insertString(doc.length, "FAIL\n", textStyles.red)
-        doc.insertString(doc.length, "  ${check.missingMessage}\n", textStyles.red)
+        doc.insertString(doc.length, "  ${check.failMessage}\n", textStyles.red)
         doc.insertString(doc.length, "  Current: ${result.displayValue}\n\n", textStyles.black)
       }
     }

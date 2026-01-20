@@ -25,7 +25,7 @@ import packetproxy.http.HttpHeader
 class XssProtectionCheck : SecurityCheck {
   override val name: String = "XSS Protection"
   override val columnName: String = "XSS Protection"
-  override val missingMessage: String = "X-Content-Type-Options: nosniff is missing"
+  override val failMessage: String = "X-Content-Type-Options: nosniff is missing"
 
   override fun check(header: HttpHeader, context: MutableMap<String, Any>): SecurityCheckResult {
     val xContentTypeOptions = header.getValue("X-Content-Type-Options").orElse("")

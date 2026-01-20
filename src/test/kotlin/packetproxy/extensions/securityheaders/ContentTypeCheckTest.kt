@@ -226,7 +226,7 @@ class ContentTypeCheckTest {
   }
 
   @Test
-  fun testGetMissingMessage() {
-    assertEquals("Content-Type header is missing charset for text/html", check.missingMessage)
+  fun testGetFailMessage() {
+    assertEquals("Content-Type header is missing charset for text/html", check.failMessage)
   }
 }

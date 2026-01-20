@@ -23,7 +23,7 @@ import packetproxy.http.HttpHeader
 class ContentTypeCheck : SecurityCheck {
   override val name: String = "Content-Type"
   override val columnName: String = "Content-Type"
-  override val missingMessage: String = "Content-Type header is missing charset for text/html"
+  override val failMessage: String = "Content-Type header is missing charset for text/html"
 
   override fun check(header: HttpHeader, context: MutableMap<String, Any>): SecurityCheckResult {
     val contentType = header.getValue("Content-Type").orElse("")

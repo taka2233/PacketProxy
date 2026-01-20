@@ -149,7 +149,7 @@ class HstsCheckTest {
   }
 
   @Test
-  fun testGetMissingMessage() {
-    assertEquals("Strict-Transport-Security header is missing", check.missingMessage)
+  fun testGetFailMessage() {
+    assertEquals("Strict-Transport-Security header is missing", check.failMessage)
   }
 }

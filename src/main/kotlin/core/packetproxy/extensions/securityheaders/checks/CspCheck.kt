@@ -30,7 +30,7 @@ class CspCheck : SecurityCheck {
 
   override val name: String = "Content-Security-Policy"
   override val columnName: String = "CSP"
-  override val missingMessage: String =
+  override val failMessage: String =
     "Content-Security-Policy with frame-ancestors or X-Frame-Options is missing"
 
   override val greenPatterns: List<String> =

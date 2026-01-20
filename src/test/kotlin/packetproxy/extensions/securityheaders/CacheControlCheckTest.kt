@@ -212,10 +212,7 @@ class CacheControlCheckTest {
   }
 
   @Test
-  fun testGetMissingMessage() {
-    assertEquals(
-      "Cache-Control is not configured for sensitive data protection",
-      check.missingMessage,
-    )
+  fun testGetFailMessage() {
+    assertEquals("Cache-Control is not configured for sensitive data protection", check.failMessage)
   }
 }

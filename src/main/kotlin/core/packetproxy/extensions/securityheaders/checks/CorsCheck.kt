@@ -31,7 +31,8 @@ class CorsCheck : SecurityCheck {
 
   override val name: String = "CORS"
   override val columnName: String = "CORS"
-  override val missingMessage: String = "Potential CORS misconfiguration (wildcard or reflection)"
+  override val failMessage: String = "CORS wildcard (*) allows all origins"
+  override val warnMessage: String = "Potential CORS Origin reflection vulnerability"
 
   override val greenPatterns: List<String> = listOf("access-control-allow-origin")
   override val yellowPatterns: List<String> = listOf("access-control-allow-origin")

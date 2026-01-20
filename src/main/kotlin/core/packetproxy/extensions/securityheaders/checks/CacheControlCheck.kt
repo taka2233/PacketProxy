@@ -23,8 +23,7 @@ import packetproxy.http.HttpHeader
 class CacheControlCheck : SecurityCheck {
   override val name: String = "Cache-Control"
   override val columnName: String = "Cache-Control"
-  override val missingMessage: String =
-    "Cache-Control is not configured for sensitive data protection"
+  override val failMessage: String = "Cache-Control is not configured for sensitive data protection"
 
   // Cache-Control doesn't affect overall pass/fail
   override val affectsOverallStatus: Boolean = false

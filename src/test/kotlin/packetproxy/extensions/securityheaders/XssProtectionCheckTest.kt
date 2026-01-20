@@ -173,7 +173,7 @@ class XssProtectionCheckTest {
   }
 
   @Test
-  fun testGetMissingMessage() {
-    assertEquals("X-Content-Type-Options: nosniff is missing", check.missingMessage)
+  fun testGetFailMessage() {
+    assertEquals("X-Content-Type-Options: nosniff is missing", check.failMessage)
   }
 }

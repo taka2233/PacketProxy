@@ -184,7 +184,7 @@ class HighlightSegmentTest {
     return object : SecurityCheck {
       override val name: String = "Test"
       override val columnName: String = "Test"
-      override val missingMessage: String = "Test missing"
+      override val failMessage: String = "Test missing"
 
       override fun check(
         header: HttpHeader,

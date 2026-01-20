@@ -38,9 +38,8 @@ import packetproxy.common.I18nString;
 import packetproxy.model.Packet;
 
 /**
- * リクエストとレスポンスを左右に並べて表示するパネル
- * 各パネルにReceived Packet, Decoded, Modified, Encoded, Allのタブを持つ
- * HTTP以外の通信では単一パケット表示モードに切り替わる
+ * リクエストとレスポンスを左右に並べて表示するパネル 各パネルにReceived Packet, Decoded, Modified, Encoded,
+ * Allのタブを持つ HTTP以外の通信では単一パケット表示モードに切り替わる
  */
 public class GUIRequestResponsePanel {
 
@@ -131,13 +130,8 @@ public class GUIRequestResponsePanel {
 	private JPanel createRequestPanel() throws Exception {
 		JPanel panel = new JPanel();
 		panel.setLayout(new BorderLayout());
-		panel.setBorder(BorderFactory.createTitledBorder(
-				BorderFactory.createLineBorder(new Color(0x33, 0x99, 0xff), 2),
-				"Request",
-				TitledBorder.LEFT,
-				TitledBorder.TOP,
-				null,
-				new Color(0x33, 0x99, 0xff)));
+		panel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(new Color(0x33, 0x99, 0xff), 2),
+				"Request", TitledBorder.LEFT, TitledBorder.TOP, null, new Color(0x33, 0x99, 0xff)));
 		// JSplitPaneでリサイズできるように最小サイズを設定
 		panel.setMinimumSize(new Dimension(100, 100));
 
@@ -179,13 +173,8 @@ public class GUIRequestResponsePanel {
 	private JPanel createResponsePanel() throws Exception {
 		JPanel panel = new JPanel();
 		panel.setLayout(new BorderLayout());
-		panel.setBorder(BorderFactory.createTitledBorder(
-				BorderFactory.createLineBorder(new Color(0x99, 0x33, 0x33), 2),
-				"Response",
-				TitledBorder.LEFT,
-				TitledBorder.TOP,
-				null,
-				new Color(0x99, 0x33, 0x33)));
+		panel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(new Color(0x99, 0x33, 0x33), 2),
+				"Response", TitledBorder.LEFT, TitledBorder.TOP, null, new Color(0x99, 0x33, 0x33)));
 		// JSplitPaneでリサイズできるように最小サイズを設定
 		panel.setMinimumSize(new Dimension(100, 100));
 
@@ -227,13 +216,8 @@ public class GUIRequestResponsePanel {
 	private JPanel createSinglePacketPanel() throws Exception {
 		JPanel panel = new JPanel();
 		panel.setLayout(new BorderLayout());
-		panel.setBorder(BorderFactory.createTitledBorder(
-				BorderFactory.createLineBorder(new Color(0x66, 0x66, 0x99), 2),
-				"Streaming Packet",
-				TitledBorder.LEFT,
-				TitledBorder.TOP,
-				null,
-				new Color(0x66, 0x66, 0x99)));
+		panel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(new Color(0x66, 0x66, 0x99), 2),
+				"Streaming Packet", TitledBorder.LEFT, TitledBorder.TOP, null, new Color(0x66, 0x66, 0x99)));
 
 		// タブの作成
 		single_tabs = new JTabbedPane();
@@ -334,20 +318,14 @@ public class GUIRequestResponsePanel {
 		updateResponsePanel();
 	}
 
-	/**
-	 * 単一パケット表示モード用：パケットを設定
-	 * Streaming通信で使用
-	 */
+	/** 単一パケット表示モード用：パケットを設定 Streaming通信で使用 */
 	public void setSinglePacket(Packet packet) {
 		showing_single_packet = packet;
 		switchToSingleView();
 		updateSinglePacketPanel();
 	}
 
-	/**
-	 * リクエスト/レスポンス分割表示モード用：両方のパケットを設定
-	 * HTTP通信で使用
-	 */
+	/** リクエスト/レスポンス分割表示モード用：両方のパケットを設定 HTTP通信で使用 */
 	public void setPackets(Packet requestPacket, Packet responsePacket) {
 		showing_request_packet = requestPacket;
 		showing_response_packet = responsePacket;
@@ -378,7 +356,7 @@ public class GUIRequestResponsePanel {
 		try {
 			int selectedIndex = request_tabs.getSelectedIndex();
 			switch (selectedIndex) {
-				case 0: // Decoded
+				case 0 : // Decoded
 					byte[] decodedData = showing_request_packet.getDecodedData();
 					if (decodedData == null || decodedData.length == 0) {
 						decodedData = showing_request_packet.getModifiedData();
@@ -388,16 +366,16 @@ public class GUIRequestResponsePanel {
 					}
 					request_decoded_tabs.setData(decodedData);
 					break;
-				case 1: // Received Packet
+				case 1 : // Received Packet
 					request_received_panel.setData(showing_request_packet.getReceivedData());
 					break;
-				case 2: // Modified
+				case 2 : // Modified
 					request_modified_panel.setData(showing_request_packet.getModifiedData());
 					break;
-				case 3: // Encoded (Sent Packet)
+				case 3 : // Encoded (Sent Packet)
 					request_sent_panel.setData(showing_request_packet.getSentData());
 					break;
-				case 4: // All
+				case 4 : // All
 					request_all_received.setData(showing_request_packet.getReceivedData(), true);
 					request_all_received.setCaretPosition(0);
 					request_all_decoded.setData(showing_request_packet.getDecodedData(), true);
@@ -421,7 +399,7 @@ public class GUIRequestResponsePanel {
 		try {
 			int selectedIndex = response_tabs.getSelectedIndex();
 			switch (selectedIndex) {
-				case 0: // Decoded
+				case 0 : // Decoded
 					byte[] decodedData = showing_response_packet.getDecodedData();
 					if (decodedData == null || decodedData.length == 0) {
 						decodedData = showing_response_packet.getModifiedData();
@@ -431,16 +409,16 @@ public class GUIRequestResponsePanel {
 					}
 					response_decoded_tabs.setData(decodedData);
 					break;
-				case 1: // Received Packet
+				case 1 : // Received Packet
 					response_received_panel.setData(showing_response_packet.getReceivedData());
 					break;
-				case 2: // Modified
+				case 2 : // Modified
 					response_modified_panel.setData(showing_response_packet.getModifiedData());
 					break;
-				case 3: // Encoded (Sent Packet)
+				case 3 : // Encoded (Sent Packet)
 					response_sent_panel.setData(showing_response_packet.getSentData());
 					break;
-				case 4: // All
+				case 4 : // All
 					response_all_received.setData(showing_response_packet.getReceivedData(), true);
 					response_all_received.setCaretPosition(0);
 					response_all_decoded.setData(showing_response_packet.getDecodedData(), true);
@@ -494,7 +472,7 @@ public class GUIRequestResponsePanel {
 		try {
 			int selectedIndex = single_tabs.getSelectedIndex();
 			switch (selectedIndex) {
-				case 0: // Decoded
+				case 0 : // Decoded
 					byte[] decodedData = showing_single_packet.getDecodedData();
 					if (decodedData == null || decodedData.length == 0) {
 						decodedData = showing_single_packet.getModifiedData();
@@ -504,16 +482,16 @@ public class GUIRequestResponsePanel {
 					}
 					single_decoded_tabs.setData(decodedData);
 					break;
-				case 1: // Received Packet
+				case 1 : // Received Packet
 					single_received_panel.setData(showing_single_packet.getReceivedData());
 					break;
-				case 2: // Modified
+				case 2 : // Modified
 					single_modified_panel.setData(showing_single_packet.getModifiedData());
 					break;
-				case 3: // Encoded (Sent Packet)
+				case 3 : // Encoded (Sent Packet)
 					single_sent_panel.setData(showing_single_packet.getSentData());
 					break;
-				case 4: // All
+				case 4 : // All
 					single_all_received.setData(showing_single_packet.getReceivedData(), true);
 					single_all_received.setCaretPosition(0);
 					single_all_decoded.setData(showing_single_packet.getDecodedData(), true);

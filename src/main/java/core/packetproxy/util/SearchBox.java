@@ -195,10 +195,7 @@ public class SearchBox extends JPanel {
 		document.setCharacterAttributes(0, str.length(), attributes, false);
 	}
 
-	/**
-	 * HTTPテキストのパラメータ部分（クエリパラメータとボディ）を色付けする。
-	 * HTTPヘッダー部分のkey=value形式はスキップする。
-	 */
+	/** HTTPテキストのパラメータ部分（クエリパラメータとボディ）を色付けする。 HTTPヘッダー部分のkey=value形式はスキップする。 */
 	public void coloringHTTPText() {
 		javax.swing.text.StyledDocument document = baseText.getStyledDocument();
 		String str = baseText.getText();

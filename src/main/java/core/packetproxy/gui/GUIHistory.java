@@ -142,12 +142,13 @@ public class GUIHistory implements PropertyChangeListener {
 		packets.addPropertyChangeListener(this);
 		ResenderPackets.getInstance().initTable(restore);
 		Filters.getInstance().addPropertyChangeListener(this);
+		pairingService = new PacketPairingService();
 		gui_packet = GUIPacket.getInstance();
+		gui_packet.setPairingService(pairingService);
 		colorManager = new TableCustomColorManager();
 		preferredPosition = 0;
 		update_packet_ids = new HashSet<Integer>();
 		id_row = new Hashtable<Integer, Integer>();
-		pairingService = PacketPairingService.getInstance();
 		autoScroll = new GUIHistoryAutoScroll();
 	}
 
@@ -1236,8 +1237,7 @@ public class GUIHistory implements PropertyChangeListener {
 	 * @param requestPacketId
 	 *            リクエストパケットID
 	 * @return レスポンスパケットID、存在しない場合は-1
-	 * @deprecated PacketPairingService.getInstance().getResponsePacketIdForRequest()
-	 *             を使用してください
+	 * @deprecated pairingService.getResponsePacketIdForRequest() を使用してください
 	 */
 	@Deprecated
 	public int getResponsePacketIdForRequest(int requestPacketId) {

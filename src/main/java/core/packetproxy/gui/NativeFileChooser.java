@@ -19,6 +19,7 @@ import java.awt.Component;
 import java.awt.FileDialog;
 import java.awt.Frame;
 import java.io.File;
+import java.io.FilenameFilter;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JFileChooser;
@@ -120,7 +121,6 @@ public class NativeFileChooser {
 		}
 	}
 
-<<<<<<< HEAD
 	/**
 	 * Show a save dialog.
 	 *
@@ -175,69 +175,55 @@ public class NativeFileChooser {
 	}
 
 	private int showNativeOpenDialog(Component parent) {
-		try {
-			Frame frame = getFrame(parent);
-			FileDialog dialog = new FileDialog(frame, dialogTitle != null ? dialogTitle : "Open", FileDialog.LOAD);
-=======
-    private int showNativeOpenDialog(Component parent) {
-        Frame frame = getFrame(parent);
-        FileDialog dialog = new FileDialog(frame, dialogTitle != null ? dialogTitle : "Open", FileDialog.LOAD);
-        
-        if (currentDirectory != null) {
-            dialog.setDirectory(currentDirectory.getAbsolutePath());
-        }
-
-        // Note: setFilenameFilter() does not work on macOS Finder.
-        // File filtering is not supported in native Mac file dialogs.
->>>>>>> d93b064 (Request/Responseの並列表示の実装で循環依存があったので修正)
-
-			if (currentDirectory != null) {
-				dialog.setDirectory(currentDirectory.getAbsolutePath());
-			}
-
-			FilenameFilter filter = createFilenameFilter();
-			if (filter != null && !acceptAllFileFilterUsed && !fileFilters.isEmpty()) {
-				FilterEntry firstFilter = fileFilters.get(0);
-				if (firstFilter.extensions.length > 0) {
-					// Build pattern like "*.json" or "*.sqlite3"
-					String pattern = "*." + firstFilter.extensions[0];
-					dialog.setFile(pattern);
-				}
-				// Also set FilenameFilter as a fallback
-				dialog.setFilenameFilter(filter);
-			}
-
-			dialog.setVisible(true);
-
-			String file = dialog.getFile();
-			String directory = dialog.getDirectory();
-
-			if (file != null && directory != null) {
-				selectedFile = new File(directory, file);
-				if (filter != null && !acceptAllFileFilterUsed) {
-					String fileName = selectedFile.getName().toLowerCase();
-					boolean matches = false;
-					for (FilterEntry entry : fileFilters) {
-						for (String ext : entry.extensions) {
-							if (fileName.endsWith("." + ext.toLowerCase())) {
-								matches = true;
-								break;
-							}
-						}
-						if (matches)
-							break;
-					}
-					if (!matches) {
-						return CANCEL_OPTION;
-					}
-				}
-				return APPROVE_OPTION;
-			}
-
-			return CANCEL_OPTION;
-		} catch (Exception e) {
-			return ERROR_OPTION;
+		Frame frame = getFrame(parent);
+		FileDialog dialog = new FileDialog(frame, dialogTitle != null ? dialogTitle : "Open", FileDialog.LOAD);
+		if (currentDirectory != null) {
+			dialog.setDirectory(currentDirectory.getAbsolutePath());
 		}
+
+		// Note: setFilenameFilter() does not work on macOS Finder.
+		// File filtering is not supported in native Mac file dialogs.
+
+		FilenameFilter filter = createFilenameFilter();
+		if (filter != null && !acceptAllFileFilterUsed && !fileFilters.isEmpty()) {
+			FilterEntry firstFilter = fileFilters.get(0);
+			if (firstFilter.extensions.length > 0) {
+				// Build pattern like "*.json" or "*.sqlite3"
+				String pattern = "*." + firstFilter.extensions[0];
+				dialog.setFile(pattern);
+			}
+			// Also set FilenameFilter as a fallback
+			dialog.setFilenameFilter(filter);
+		}
+
+		dialog.setVisible(true);
+
+		String file = dialog.getFile();
+		String directory = dialog.getDirectory();
+
+		if (file != null && directory != null) {
+			selectedFile = new File(directory, file);
+			if (filter != null && !acceptAllFileFilterUsed) {
+				String fileName = selectedFile.getName().toLowerCase();
+				boolean matches = false;
+				for (FilterEntry entry : fileFilters) {
+					for (String ext : entry.extensions) {
+						if (fileName.endsWith("." + ext.toLowerCase())) {
+							matches = true;
+							break;
+						}
+					}
+					if (matches)
+						break;
+				}
+				if (!matches) {
+					return CANCEL_OPTION;
+				}
+			}
+			return APPROVE_OPTION;
+		}
+
+		return CANCEL_OPTION;
 	}
 
 	private int showNativeSaveDialog(Component parent) {

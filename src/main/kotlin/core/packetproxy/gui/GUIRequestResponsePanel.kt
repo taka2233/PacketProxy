@@ -56,7 +56,7 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
 
   private enum class ViewType {
     SPLIT,
-    SINGLE
+    SINGLE,
   }
 
   private enum class TabType(val index: Int) {
@@ -117,7 +117,7 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
   private inner class PacketDetailPane(
     private val title: String,
     private val borderColor: Color,
-    private val shouldSetMinimumSize: Boolean
+    private val shouldSetMinimumSize: Boolean,
   ) {
     val panel: JPanel = JPanel()
     private val tabs = JTabbedPane()
@@ -139,7 +139,7 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
           TitledBorder.LEFT,
           TitledBorder.TOP,
           null,
-          borderColor
+          borderColor,
         )
       if (shouldSetMinimumSize) {
         panel.minimumSize = Dimension(MIN_PANEL_SIZE, MIN_PANEL_SIZE)

@@ -17,9 +17,7 @@ package packetproxy.gui
 
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * リクエストとレスポンスのパケットペアリングを管理するサービス。GUIHistoryとGUIPacket間の循環依存を解消するために抽出されたクラス。
- */
+/** リクエストとレスポンスのパケットペアリングを管理するサービス。GUIHistoryとGUIPacket間の循環依存を解消するために抽出されたクラス。 */
 class PacketPairingService {
   private companion object {
     private const val NO_RESPONSE_PACKET_ID = -1
@@ -153,9 +151,7 @@ class PacketPairingService {
    * @return インクリメント後のパケット数
    */
   fun incrementGroupPacketCount(groupId: Long): Int {
-    return groupPacketCount.compute(groupId) { _, currentCount ->
-      (currentCount ?: 0) + 1
-    } ?: 0
+    return groupPacketCount.compute(groupId) { _, currentCount -> (currentCount ?: 0) + 1 } ?: 0
   }
 
   /**

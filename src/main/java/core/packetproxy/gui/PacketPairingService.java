@@ -20,169 +20,216 @@ import java.util.Hashtable;
 import java.util.Map;
 
 /**
- * リクエストとレスポンスのパケットペアリングを管理するサービス。
- * GUIHistoryとGUIPacket間の循環依存を解消するために抽出されたクラス。
+ * リクエストとレスポンスのパケットペアリングを管理するサービス。 GUIHistoryとGUIPacket間の循環依存を解消するために抽出されたクラス。
  */
 public class PacketPairingService {
 
-    private static PacketPairingService instance;
+	private static PacketPairingService instance;
 
-    // グループIDと行番号のマッピング（リクエスト行を追跡）
-    private Hashtable<Long, Integer> groupRow;
-    // レスポンスが既にマージされているグループID
-    private HashSet<Long> groupHasResponse;
-    // レスポンスパケットIDとリクエストパケットIDのマッピング（マージされた行用）
-    private Hashtable<Integer, Integer> responseToRequestId;
-    // グループIDごとのパケット数（3個以上でマージしない）
-    private Hashtable<Long, Integer> groupPacketCount;
+	// グループIDと行番号のマッピング（リクエスト行を追跡）
+	private Hashtable<Long, Integer> groupRow;
+	// レスポンスが既にマージされているグループID
+	private HashSet<Long> groupHasResponse;
+	// レスポンスパケットIDとリクエストパケットIDのマッピング（マージされた行用）
+	private Hashtable<Integer, Integer> responseToRequestId;
+	// グループIDごとのパケット数（3個以上でマージしない）
+	private Hashtable<Long, Integer> groupPacketCount;
 
-    public static PacketPairingService getInstance() {
-        if (instance == null) {
-            instance = new PacketPairingService();
-        }
-        return instance;
-    }
+	public static PacketPairingService getInstance() {
+		if (instance == null) {
+			instance = new PacketPairingService();
+		}
+		return instance;
+	}
 
-    private PacketPairingService() {
-        groupRow = new Hashtable<>();
-        groupHasResponse = new HashSet<>();
-        responseToRequestId = new Hashtable<>();
-        groupPacketCount = new Hashtable<>();
-    }
+	private PacketPairingService() {
+		groupRow = new Hashtable<>();
+		groupHasResponse = new HashSet<>();
+		responseToRequestId = new Hashtable<>();
+		groupPacketCount = new Hashtable<>();
+	}
 
-    /**
-     * すべてのペアリング情報をクリアする
-     */
-    public void clear() {
-        groupRow.clear();
-        groupHasResponse.clear();
-        responseToRequestId.clear();
-        groupPacketCount.clear();
-    }
+	/** すべてのペアリング情報をクリアする */
+	public void clear() {
+		groupRow.clear();
+		groupHasResponse.clear();
+		responseToRequestId.clear();
+		groupPacketCount.clear();
+	}
 
-    /**
-     * グループIDに対応する行インデックスを登録する
-     * @param groupId グループID
-     * @param rowIndex 行インデックス
-     */
-    public void registerGroupRow(long groupId, int rowIndex) {
-        groupRow.put(groupId, rowIndex);
-    }
+	/**
+	 * グループIDに対応する行インデックスを登録する
+	 *
+	 * @param groupId
+	 *            グループID
+	 * @param rowIndex
+	 *            行インデックス
+	 */
+	public void registerGroupRow(long groupId, int rowIndex) {
+		groupRow.put(groupId, rowIndex);
+	}
 
-    /**
-     * グループIDに対応する行インデックスを取得する
-     * @param groupId グループID
-     * @return 行インデックス、存在しない場合はnull
-     */
-    public Integer getRowForGroup(long groupId) {
-        return groupRow.get(groupId);
-    }
+	/**
+	 * グループIDに対応する行インデックスを取得する
+	 *
+	 * @param groupId
+	 *            グループID
+	 * @return 行インデックス、存在しない場合はnull
+	 */
+	public Integer getRowForGroup(long groupId) {
+		return groupRow.get(groupId);
+	}
 
-    /**
-     * グループIDが登録されているか確認する
-     * @param groupId グループID
-     * @return 登録されている場合true
-     */
-    public boolean containsGroup(long groupId) {
-        return groupRow.containsKey(groupId);
-    }
+	/**
+	 * グループIDが登録されているか確認する
+	 *
+	 * @param groupId
+	 *            グループID
+	 * @return 登録されている場合true
+	 */
+	public boolean containsGroup(long groupId) {
+		return groupRow.containsKey(groupId);
+	}
 
-    /**
-     * グループにレスポンスがマージされたことを記録する
-     * @param groupId グループID
-     */
-    public void markGroupHasResponse(long groupId) {
-        groupHasResponse.add(groupId);
-    }
+	/**
+	 * グループにレスポンスがマージされたことを記録する
+	 *
+	 * @param groupId
+	 *            グループID
+	 */
+	public void markGroupHasResponse(long groupId) {
+		groupHasResponse.add(groupId);
+	}
 
-    /**
-     * グループにレスポンスがマージされているか確認する
-     * @param groupId グループID
-     * @return マージされている場合true
-     */
-    public boolean hasResponse(long groupId) {
-        return groupHasResponse.contains(groupId);
-    }
+	/**
+	 * グループにレスポンスがマージされているか確認する
+	 *
+	 * @param groupId
+	 *            グループID
+	 * @return マージされている場合true
+	 */
+	public boolean hasResponse(long groupId) {
+		return groupHasResponse.contains(groupId);
+	}
 
-    /**
-     * レスポンスパケットIDとリクエストパケットIDのペアリングを登録する
-     * @param responsePacketId レスポンスパケットID
-     * @param requestPacketId リクエストパケットID
-     */
-    public void registerPairing(int responsePacketId, int requestPacketId) {
-        responseToRequestId.put(responsePacketId, requestPacketId);
-    }
+	/**
+	 * レスポンスパケットIDとリクエストパケットIDのペアリングを登録する
+	 *
+	 * @param responsePacketId
+	 *            レスポンスパケットID
+	 * @param requestPacketId
+	 *            リクエストパケットID
+	 */
+	public void registerPairing(int responsePacketId, int requestPacketId) {
+		responseToRequestId.put(responsePacketId, requestPacketId);
+	}
 
-    /**
-     * レスポンスパケットIDに対応するリクエストパケットIDを取得する
-     * @param responsePacketId レスポンスパケットID
-     * @return リクエストパケットID、存在しない場合はnull
-     */
-    public Integer getRequestIdForResponse(int responsePacketId) {
-        return responseToRequestId.get(responsePacketId);
-    }
+	/**
+	 * レスポンスパケットIDに対応するリクエストパケットIDを取得する
+	 *
+	 * @param responsePacketId
+	 *            レスポンスパケットID
+	 * @return リクエストパケットID、存在しない場合はnull
+	 */
+	public Integer getRequestIdForResponse(int responsePacketId) {
+		return responseToRequestId.get(responsePacketId);
+	}
 
-    /**
-     * レスポンスパケットIDがペアリングに登録されているか確認する
-     * @param responsePacketId レスポンスパケットID
-     * @return 登録されている場合true
-     */
-    public boolean containsResponsePairing(int responsePacketId) {
-        return responseToRequestId.containsKey(responsePacketId);
-    }
+	/**
+	 * レスポンスパケットIDがペアリングに登録されているか確認する
+	 *
+	 * @param responsePacketId
+	 *            レスポンスパケットID
+	 * @return 登録されている場合true
+	 */
+	public boolean containsResponsePairing(int responsePacketId) {
+		return responseToRequestId.containsKey(responsePacketId);
+	}
 
-    /**
-     * リクエストパケットIDに対応するレスポンスパケットIDを取得する
-     * マージされた行の場合のみ有効
-     * @param requestPacketId リクエストパケットID
-     * @return レスポンスパケットID、存在しない場合は-1
-     */
-    public int getResponsePacketIdForRequest(int requestPacketId) {
-        for (Map.Entry<Integer, Integer> entry : responseToRequestId.entrySet()) {
-            if (entry.getValue() == requestPacketId) {
-                return entry.getKey();
-            }
-        }
-        return -1;
-    }
+	/**
+	 * リクエストパケットIDに対応するレスポンスパケットIDを取得する マージされた行の場合のみ有効
+	 *
+	 * @param requestPacketId
+	 *            リクエストパケットID
+	 * @return レスポンスパケットID、存在しない場合は-1
+	 */
+	public int getResponsePacketIdForRequest(int requestPacketId) {
+		for (Map.Entry<Integer, Integer> entry : responseToRequestId.entrySet()) {
+			if (entry.getValue() == requestPacketId) {
+				return entry.getKey();
+			}
+		}
+		return -1;
+	}
 
-    /**
-     * 選択された行がマージされた行（リクエスト+レスポンス）かどうかを判定
-     * @param packetId パケットID
-     * @return マージされた行の場合true
-     */
-    public boolean isMergedRow(int packetId) {
-        return getResponsePacketIdForRequest(packetId) != -1;
-    }
+	/**
+	 * 選択された行がマージされた行（リクエスト+レスポンス）かどうかを判定
+	 *
+	 * @param packetId
+	 *            パケットID
+	 * @return マージされた行の場合true
+	 */
+	public boolean isMergedRow(int packetId) {
+		return getResponsePacketIdForRequest(packetId) != -1;
+	}
 
-    /**
-     * グループのパケット数をインクリメントする
-     * @param groupId グループID
-     * @return インクリメント後のパケット数
-     */
-    public int incrementGroupPacketCount(long groupId) {
-        int count = groupPacketCount.getOrDefault(groupId, 0) + 1;
-        groupPacketCount.put(groupId, count);
-        return count;
-    }
+	/**
+	 * グループのパケット数をインクリメントする
+	 *
+	 * @param groupId
+	 *            グループID
+	 * @return インクリメント後のパケット数
+	 */
+	public int incrementGroupPacketCount(long groupId) {
+		int count = groupPacketCount.getOrDefault(groupId, 0) + 1;
+		groupPacketCount.put(groupId, count);
+		return count;
+	}
 
-    /**
-     * グループのパケット数を取得する
-     * @param groupId グループID
-     * @return パケット数
-     */
-    public int getGroupPacketCount(long groupId) {
-        return groupPacketCount.getOrDefault(groupId, 0);
-    }
+	/**
+	 * グループのパケット数を取得する
+	 *
+	 * @param groupId
+	 *            グループID
+	 * @return パケット数
+	 */
+	public int getGroupPacketCount(long groupId) {
+		return groupPacketCount.getOrDefault(groupId, 0);
+	}
 
-    /**
-     * グループがマージ可能かどうかを判定する
-     * パケット数が2以下の場合のみマージ可能
-     * @param groupId グループID
-     * @return マージ可能な場合true
-     */
-    public boolean isGroupMergeable(long groupId) {
-        return getGroupPacketCount(groupId) <= 2;
-    }
+	/**
+	 * グループがマージ可能かどうかを判定する パケット数が2以下の場合のみマージ可能
+	 *
+	 * @param groupId
+	 *            グループID
+	 * @return マージ可能な場合true
+	 */
+	public boolean isGroupMergeable(long groupId) {
+		return getGroupPacketCount(groupId) <= 2;
+	}
+
+	/**
+	 * グループのマージ状態を解除する（ストリーミング通信で3つ目以降のパケットが来た場合に使用）
+	 *
+	 * @param groupId
+	 *            グループID
+	 */
+	public void unmergeGroup(long groupId) {
+		groupHasResponse.remove(groupId);
+	}
+
+	/**
+	 * 指定されたリクエストパケットIDに対応するレスポンスのペアリングを解除する
+	 *
+	 * @param requestPacketId
+	 *            リクエストパケットID
+	 * @return 解除されたレスポンスパケットID、存在しない場合は-1
+	 */
+	public int unregisterPairingByRequestId(int requestPacketId) {
+		int responsePacketId = getResponsePacketIdForRequest(requestPacketId);
+		if (responsePacketId != -1) {
+			responseToRequestId.remove(responsePacketId);
+		}
+		return responsePacketId;
+	}
 }
-

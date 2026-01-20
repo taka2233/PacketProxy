@@ -695,8 +695,9 @@ public class GUIHistory implements PropertyChangeListener {
 			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
 
 			// グループIDが設定されている場合、パケット数をカウント
+			int packetCount = 0;
 			if (groupId != 0) {
-				pairingService.incrementGroupPacketCount(groupId);
+				packetCount = pairingService.incrementGroupPacketCount(groupId);
 			}
 
 			// レスポンスをリクエスト行にマージする条件：
@@ -704,10 +705,15 @@ public class GUIHistory implements PropertyChangeListener {
 			// - 同じグループのリクエスト行が存在する
 			// - まだレスポンスがマージされていない
 			// - グループのパケット数が2以下（3個以上はストリーミング等なのでマージしない）
-			boolean shouldMerge = isResponse && groupId != 0
-					&& pairingService.containsGroup(groupId)
-					&& !pairingService.hasResponse(groupId)
-					&& pairingService.isGroupMergeable(groupId);
+			boolean containsGroup = pairingService.containsGroup(groupId);
+			boolean hasResponse = pairingService.hasResponse(groupId);
+			boolean isMergeable = pairingService.isGroupMergeable(groupId);
+			boolean shouldMerge = isResponse && groupId != 0 && containsGroup && !hasResponse && isMergeable;
+
+			// パケット数が3になった時点で、既存のマージを解除する（ストリーミング通信対応）
+			if (packetCount == 3 && hasResponse && containsGroup) {
+				unmergeExistingPairing(groupId);
+			}
 
 			if (shouldMerge) {
 
@@ -718,13 +724,21 @@ public class GUIHistory implements PropertyChangeListener {
 				tableModel.setValueAt(packet.getSummarizedResponse(), rowIndex, 2);
 				// Length列を更新（リクエスト + レスポンスの合計）
 				int currentLength = (Integer) tableModel.getValueAt(rowIndex, 3);
-				byte[] responseData = packet.getDecodedData().length > 0 ? packet.getDecodedData() : packet.getModifiedData();
+				byte[] responseData = packet.getDecodedData().length > 0
+						? packet.getDecodedData()
+						: packet.getModifiedData();
 				tableModel.setValueAt(currentLength + responseData.length, rowIndex, 3);
 
 				// マッピングを更新
 				pairingService.markGroupHasResponse(groupId);
 				pairingService.registerPairing(positiveValue, requestPacketId);
 				id_row.put(positiveValue, rowIndex);
+
+				// 選択中のパケットがマージされた場合、詳細表示を強制更新
+				if (requestPacketId == getSelectedPacketId()) {
+					Packet requestPacket = packets.query(requestPacketId);
+					gui_packet.setPacket(requestPacket, true);
+				}
 			} else {
 
 				// 新しい行を追加
@@ -741,6 +755,48 @@ public class GUIHistory implements PropertyChangeListener {
 		} else {
 
 			updateRequestOne(value);
+		}
+	}
+
+	/**
+	 * 既存のマージを解除する（ストリーミング通信で3つ目以降のパケットが来た場合）
+	 *
+	 * @param groupId
+	 *            グループID
+	 */
+	private void unmergeExistingPairing(long groupId) throws Exception {
+		Integer rowIndex = pairingService.getRowForGroup(groupId);
+		if (rowIndex == null) {
+			return;
+		}
+
+		int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
+
+		// 以前マージされていたレスポンスパケットIDを取得してペアリングを解除
+		int responsePacketId = pairingService.unregisterPairingByRequestId(requestPacketId);
+		pairingService.unmergeGroup(groupId);
+
+		if (responsePacketId == -1) {
+			return;
+		}
+
+		// リクエスト行を元に戻す（Server Response列をクリア、Lengthを再計算）
+		Packet requestPacket = packets.query(requestPacketId);
+		byte[] requestData = requestPacket.getDecodedData().length > 0
+				? requestPacket.getDecodedData()
+				: requestPacket.getModifiedData();
+		tableModel.setValueAt("", rowIndex, 2); // Server Response列をクリア
+		tableModel.setValueAt(requestData.length, rowIndex, 3); // Length列を再計算
+
+		// 以前マージされていたレスポンスパケット用の新しい行を追加
+		Packet responsePacket = packets.query(responsePacketId);
+		tableModel.addRow(makeRowDataFromPacket(responsePacket));
+		int newRowIndex = tableModel.getRowCount() - 1;
+		id_row.put(responsePacketId, newRowIndex);
+
+		// 選択中のパケットだった場合は詳細表示を更新
+		if (requestPacketId == getSelectedPacketId()) {
+			gui_packet.setPacket(requestPacket, true);
 		}
 	}
 
@@ -861,10 +917,8 @@ public class GUIHistory implements PropertyChangeListener {
 			}
 
 			// レスポンスをリクエスト行にマージする条件
-			boolean shouldMerge = isResponse && groupId != 0
-					&& pairingService.containsGroup(groupId)
-					&& !pairingService.hasResponse(groupId)
-					&& pairingService.isGroupMergeable(groupId);
+			boolean shouldMerge = isResponse && groupId != 0 && pairingService.containsGroup(groupId)
+					&& !pairingService.hasResponse(groupId) && pairingService.isGroupMergeable(groupId);
 
 			if (shouldMerge) {
 
@@ -875,7 +929,9 @@ public class GUIHistory implements PropertyChangeListener {
 				tableModel.setValueAt(packet.getSummarizedResponse(), rowIndex, 2);
 				// Length列を更新
 				int currentLength = (Integer) tableModel.getValueAt(rowIndex, 3);
-				byte[] responseData = packet.getDecodedData().length > 0 ? packet.getDecodedData() : packet.getModifiedData();
+				byte[] responseData = packet.getDecodedData().length > 0
+						? packet.getDecodedData()
+						: packet.getModifiedData();
 				tableModel.setValueAt(currentLength + responseData.length, rowIndex, 3);
 
 				// マッピングを更新
@@ -919,10 +975,8 @@ public class GUIHistory implements PropertyChangeListener {
 			}
 
 			// レスポンスをリクエスト行にマージする条件
-			boolean shouldMerge = isResponse && groupId != 0
-					&& pairingService.containsGroup(groupId)
-					&& !pairingService.hasResponse(groupId)
-					&& pairingService.isGroupMergeable(groupId);
+			boolean shouldMerge = isResponse && groupId != 0 && pairingService.containsGroup(groupId)
+					&& !pairingService.hasResponse(groupId) && pairingService.isGroupMergeable(groupId);
 
 			if (shouldMerge) {
 
@@ -1031,6 +1085,23 @@ public class GUIHistory implements PropertyChangeListener {
 
 		int packetId = packet.getId();
 		boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
+		long groupId = packet.getGroup();
+
+		// リクエストパケットの場合、groupIdが変更されている可能性があるのでマッピングを更新
+		// （encoder.setGroupId()によってgroupIdが変更された場合の対応）
+		if (!isResponse && groupId != 0) {
+
+			Integer row_index = id_row.get(packetId);
+			if (row_index != null && !pairingService.containsGroup(groupId)) {
+
+				pairingService.registerGroupRow(groupId, row_index);
+				// カウントも更新（まだカウントされていない場合）
+				if (pairingService.getGroupPacketCount(groupId) == 0) {
+
+					pairingService.incrementGroupPacketCount(groupId);
+				}
+			}
+		}
 
 		// マージされたレスポンスパケットの場合、リクエスト行を更新
 		if (isResponse && pairingService.containsResponsePairing(packetId)) {
@@ -1043,8 +1114,12 @@ public class GUIHistory implements PropertyChangeListener {
 				// Length列を再計算
 				int requestPacketId = pairingService.getRequestIdForResponse(packetId);
 				Packet requestPacket = packets.query(requestPacketId);
-				byte[] requestData = requestPacket.getDecodedData().length > 0 ? requestPacket.getDecodedData() : requestPacket.getModifiedData();
-				byte[] responseData = packet.getDecodedData().length > 0 ? packet.getDecodedData() : packet.getModifiedData();
+				byte[] requestData = requestPacket.getDecodedData().length > 0
+						? requestPacket.getDecodedData()
+						: requestPacket.getModifiedData();
+				byte[] responseData = packet.getDecodedData().length > 0
+						? packet.getDecodedData()
+						: packet.getModifiedData();
 				tableModel.setValueAt(requestData.length + responseData.length, row_index, 3);
 			}
 			return;
@@ -1054,7 +1129,6 @@ public class GUIHistory implements PropertyChangeListener {
 		Object[] row_data = makeRowDataFromPacket(packet);
 
 		// リクエストパケットの更新時、マージされたレスポンス情報を保持
-		long groupId = packet.getGroup();
 		boolean hasResponse = groupId != 0 && pairingService.hasResponse(groupId);
 
 		for (int i = 0; i < columnNames.length; i++) {
@@ -1157,11 +1231,13 @@ public class GUIHistory implements PropertyChangeListener {
 	}
 
 	/**
-	 * リクエストパケットIDに対応するレスポンスパケットIDを取得する
-	 * マージされた行の場合のみ有効
-	 * @param requestPacketId リクエストパケットID
+	 * リクエストパケットIDに対応するレスポンスパケットIDを取得する マージされた行の場合のみ有効
+	 *
+	 * @param requestPacketId
+	 *            リクエストパケットID
 	 * @return レスポンスパケットID、存在しない場合は-1
-	 * @deprecated PacketPairingService.getInstance().getResponsePacketIdForRequest() を使用してください
+	 * @deprecated PacketPairingService.getInstance().getResponsePacketIdForRequest()
+	 *             を使用してください
 	 */
 	@Deprecated
 	public int getResponsePacketIdForRequest(int requestPacketId) {
@@ -1170,6 +1246,7 @@ public class GUIHistory implements PropertyChangeListener {
 
 	/**
 	 * 選択された行がマージされた行（リクエスト+レスポンス）かどうかを判定
+	 *
 	 * @return マージされた行の場合true
 	 */
 	public boolean isSelectedRowMerged() {

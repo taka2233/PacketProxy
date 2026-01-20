@@ -63,7 +63,19 @@ public class GUIPacket {
 	}
 
 	public void setPacket(Packet packet) {
-		if (showing_packet != null && showing_packet.getId() == packet.getId()) {
+		setPacket(packet, false);
+	}
+
+	/**
+	 * パケットを設定して表示を更新する
+	 *
+	 * @param packet
+	 *            表示するパケット
+	 * @param forceRefresh
+	 *            trueの場合、同じパケットIDでも強制的に再描画する
+	 */
+	public void setPacket(Packet packet, boolean forceRefresh) {
+		if (!forceRefresh && showing_packet != null && showing_packet.getId() == packet.getId()) {
 
 			return;
 		}

@@ -29,6 +29,7 @@ public class GUIPacket {
 	private GUIRequestResponsePanel request_response_panel;
 	private Packet showing_packet;
 	private Packet showing_response_packet;
+	private PacketPairingService pairingService;
 
 	public static GUIPacket getInstance() throws Exception {
 		if (instance == null) {
@@ -42,6 +43,7 @@ public class GUIPacket {
 		this.owner = GUIHistory.getOwner();
 		this.showing_packet = null;
 		this.showing_response_packet = null;
+		this.pairingService = null;
 	}
 
 	public JComponent createPanel() throws Exception {
@@ -81,7 +83,9 @@ public class GUIPacket {
 		}
 
 		// パケットのペアリング状態から表示モードを判断
-		PacketPairingService pairingService = PacketPairingService.getInstance();
+		if (pairingService == null) {
+			throw new IllegalStateException("PacketPairingService is not set");
+		}
 		int responsePacketId = pairingService.getResponsePacketIdForRequest(packet.getId());
 
 		if (responsePacketId != -1) {
@@ -120,5 +124,9 @@ public class GUIPacket {
 
 	public Packet getResponsePacket() {
 		return showing_response_packet;
+	}
+
+	public void setPairingService(PacketPairingService pairingService) {
+		this.pairingService = pairingService;
 	}
 }

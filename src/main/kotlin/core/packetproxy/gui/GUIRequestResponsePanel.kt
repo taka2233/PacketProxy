@@ -1,0 +1,311 @@
+/*
+ * Copyright 2019 DeNA Co., Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package packetproxy.gui
+
+import java.awt.BorderLayout
+import java.awt.CardLayout
+import java.awt.Color
+import java.awt.Dimension
+import java.awt.GridLayout
+import javax.swing.BorderFactory
+import javax.swing.BoxLayout
+import javax.swing.JComponent
+import javax.swing.JFrame
+import javax.swing.JLabel
+import javax.swing.JPanel
+import javax.swing.JScrollPane
+import javax.swing.JSplitPane
+import javax.swing.JTabbedPane
+import javax.swing.ScrollPaneConstants
+import javax.swing.border.TitledBorder
+import javax.swing.event.ChangeListener
+import packetproxy.common.I18nString
+import packetproxy.model.Packet
+import packetproxy.util.Logging.errWithStackTrace
+
+/**
+ * リクエストとレスポンスを左右に並べて表示するパネル 各パネルにReceived Packet, Decoded, Modified, Encoded, Allのタブを持つ
+ * HTTP以外の通信では単一パケット表示モードに切り替わる
+ */
+class GUIRequestResponsePanel(private val owner: JFrame) {
+  private companion object {
+    private const val SPLIT_PANE_DIVIDER_SIZE = 8
+    private const val ALL_PANEL_ROWS = 1
+    private const val ALL_PANEL_COLUMNS = 4
+    private const val LABEL_ALIGNMENT_CENTER = 0.5f
+    private const val MIN_PANEL_SIZE = 100
+    private const val SPLIT_PANE_RESIZE_WEIGHT = 0.5
+    private val REQUEST_BORDER_COLOR = Color(0x33, 0x99, 0xff)
+    private val RESPONSE_BORDER_COLOR = Color(0x99, 0x33, 0x33)
+    private val SINGLE_BORDER_COLOR = Color(0x66, 0x66, 0x99)
+    private val EMPTY_DATA = ByteArray(0)
+  }
+
+  private enum class ViewType {
+    SPLIT,
+    SINGLE
+  }
+
+  private enum class TabType(val index: Int) {
+    DECODED(0),
+    RECEIVED(1),
+    MODIFIED(2),
+    ENCODED(3),
+    ALL(4);
+
+    companion object {
+      fun fromIndex(index: Int): TabType? {
+        return values().firstOrNull { it.index == index }
+      }
+    }
+  }
+
+  private lateinit var mainPanel: JPanel
+  private lateinit var cardLayout: CardLayout
+  private lateinit var splitPane: JSplitPane
+
+  private lateinit var requestPane: PacketDetailPane
+  private lateinit var responsePane: PacketDetailPane
+  private lateinit var singlePane: PacketDetailPane
+
+  // 現在表示中のパケット
+  private var showingRequestPacket: Packet? = null
+  private var showingResponsePacket: Packet? = null
+  private var showingSinglePacket: Packet? = null
+  private var currentView: ViewType = ViewType.SPLIT
+
+  @Throws(Exception::class)
+  fun createPanel(): JComponent {
+    cardLayout = CardLayout()
+    mainPanel = JPanel(cardLayout)
+
+    // === 分割ビュー（HTTP用）===
+    requestPane = PacketDetailPane("Request", REQUEST_BORDER_COLOR, true)
+    responsePane = PacketDetailPane("Response", RESPONSE_BORDER_COLOR, true)
+    requestPane.addChangeListener(ChangeListener { updateRequestPanel() })
+    responsePane.addChangeListener(ChangeListener { updateResponsePanel() })
+
+    // 左右に分割
+    splitPane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, requestPane.panel, responsePane.panel)
+    splitPane.resizeWeight = SPLIT_PANE_RESIZE_WEIGHT
+    splitPane.isContinuousLayout = true
+    splitPane.dividerSize = SPLIT_PANE_DIVIDER_SIZE
+
+    mainPanel.add(splitPane, ViewType.SPLIT.name)
+
+    // === 単一パケットビュー（非HTTP用）===
+    singlePane = PacketDetailPane("Streaming Packet", SINGLE_BORDER_COLOR, false)
+    singlePane.addChangeListener(ChangeListener { updateSinglePacketPanel() })
+    mainPanel.add(singlePane.panel, ViewType.SINGLE.name)
+
+    return mainPanel
+  }
+
+  private inner class PacketDetailPane(
+    private val title: String,
+    private val borderColor: Color,
+    private val shouldSetMinimumSize: Boolean
+  ) {
+    val panel: JPanel = JPanel()
+    private val tabs = JTabbedPane()
+    private val decodedTabs = TabSet(true, false)
+    private val receivedPanel = GUIData(owner)
+    private val modifiedPanel = GUIData(owner)
+    private val sentPanel = GUIData(owner)
+    private lateinit var allReceived: RawTextPane
+    private lateinit var allDecoded: RawTextPane
+    private lateinit var allModified: RawTextPane
+    private lateinit var allSent: RawTextPane
+
+    init {
+      panel.layout = BorderLayout()
+      panel.border =
+        BorderFactory.createTitledBorder(
+          BorderFactory.createLineBorder(borderColor, 2),
+          title,
+          TitledBorder.LEFT,
+          TitledBorder.TOP,
+          null,
+          borderColor
+        )
+      if (shouldSetMinimumSize) {
+        panel.minimumSize = Dimension(MIN_PANEL_SIZE, MIN_PANEL_SIZE)
+      }
+
+      tabs.addTab("Decoded", decodedTabs.tabPanel)
+      tabs.addTab("Received Packet", receivedPanel.createPanel())
+      tabs.addTab("Modified", modifiedPanel.createPanel())
+      tabs.addTab("Encoded (Sent Packet)", sentPanel.createPanel())
+      tabs.addTab("All", createAllPanel())
+
+      panel.add(tabs, BorderLayout.CENTER)
+    }
+
+    fun addChangeListener(listener: ChangeListener) {
+      tabs.addChangeListener(listener)
+    }
+
+    fun update(packet: Packet?) {
+      if (packet == null) {
+        clear()
+        return
+      }
+      try {
+        when (TabType.fromIndex(tabs.selectedIndex)) {
+          TabType.DECODED -> decodedTabs.setData(resolveDecodedData(packet))
+          TabType.RECEIVED -> receivedPanel.setData(packet.getReceivedData())
+          TabType.MODIFIED -> modifiedPanel.setData(packet.getModifiedData())
+          TabType.ENCODED -> sentPanel.setData(packet.getSentData())
+          TabType.ALL -> {
+            allReceived.setData(packet.getReceivedData(), true)
+            allReceived.caretPosition = 0
+            allDecoded.setData(packet.getDecodedData(), true)
+            allDecoded.caretPosition = 0
+            allModified.setData(packet.getModifiedData(), true)
+            allModified.caretPosition = 0
+            allSent.setData(packet.getSentData(), true)
+            allSent.caretPosition = 0
+          }
+          null -> return
+        }
+      } catch (e: Exception) {
+        errWithStackTrace(e)
+      }
+    }
+
+    fun clear() {
+      try {
+        decodedTabs.setData(EMPTY_DATA)
+        receivedPanel.setData(EMPTY_DATA)
+        modifiedPanel.setData(EMPTY_DATA)
+        sentPanel.setData(EMPTY_DATA)
+        allReceived.setData(EMPTY_DATA, true)
+        allDecoded.setData(EMPTY_DATA, true)
+        allModified.setData(EMPTY_DATA, true)
+        allSent.setData(EMPTY_DATA, true)
+      } catch (e: Exception) {
+        errWithStackTrace(e)
+      }
+    }
+
+    fun getDecodedData(): ByteArray {
+      return decodedTabs.getData()
+    }
+
+    private fun createAllPanel(): JComponent {
+      val panel = JPanel()
+      panel.layout = GridLayout(ALL_PANEL_ROWS, ALL_PANEL_COLUMNS)
+
+      allReceived = createTextPaneForAll(panel, I18nString.get("Received"))
+      allDecoded = createTextPaneForAll(panel, I18nString.get("Decoded"))
+      allModified = createTextPaneForAll(panel, I18nString.get("Modified"))
+      allSent = createTextPaneForAll(panel, I18nString.get("Encoded"))
+
+      return panel
+    }
+  }
+
+  @Throws(Exception::class)
+  private fun createTextPaneForAll(parentPanel: JPanel, labelName: String): RawTextPane {
+    val panel = JPanel()
+    panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
+
+    val label = JLabel(labelName)
+    label.alignmentX = LABEL_ALIGNMENT_CENTER
+
+    val text = RawTextPane()
+    text.isEditable = false
+    panel.add(label)
+    val scroll = JScrollPane(text)
+    scroll.verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
+    scroll.horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED
+    panel.add(scroll)
+    parentPanel.add(panel)
+    return text
+  }
+
+  fun setRequestPacket(packet: Packet) {
+    showingRequestPacket = packet
+    updateRequestPanel()
+  }
+
+  fun setResponsePacket(packet: Packet) {
+    showingResponsePacket = packet
+    updateResponsePanel()
+  }
+
+  /** 単一パケット表示モード用：パケットを設定 Streaming通信で使用 */
+  fun setSinglePacket(packet: Packet) {
+    showingSinglePacket = packet
+    switchToSingleView()
+    updateSinglePacketPanel()
+  }
+
+  /** リクエスト/レスポンス分割表示モード用：両方のパケットを設定 HTTP通信で使用 */
+  fun setPackets(requestPacket: Packet, responsePacket: Packet) {
+    showingRequestPacket = requestPacket
+    showingResponsePacket = responsePacket
+    switchToSplitView()
+    updateRequestPanel()
+    updateResponsePanel()
+  }
+
+  private fun switchToSplitView() {
+    if (currentView != ViewType.SPLIT) {
+      currentView = ViewType.SPLIT
+      cardLayout.show(mainPanel, ViewType.SPLIT.name)
+    }
+  }
+
+  private fun switchToSingleView() {
+    if (currentView != ViewType.SINGLE) {
+      currentView = ViewType.SINGLE
+      cardLayout.show(mainPanel, ViewType.SINGLE.name)
+    }
+  }
+
+  private fun resolveDecodedData(packet: Packet): ByteArray {
+    var decodedData = packet.getDecodedData()
+    if (decodedData == null || decodedData.isEmpty()) {
+      decodedData = packet.getModifiedData()
+    }
+    return decodedData ?: EMPTY_DATA
+  }
+
+  private fun updateRequestPanel() {
+    requestPane.update(showingRequestPacket)
+  }
+
+  private fun updateResponsePanel() {
+    responsePane.update(showingResponsePacket)
+  }
+
+  private fun updateSinglePacketPanel() {
+    singlePane.update(showingSinglePacket)
+  }
+
+  fun getRequestData(): ByteArray {
+    if (showingRequestPacket == null) return EMPTY_DATA
+    // Decodedタブからデータを取得
+    return requestPane.getDecodedData()
+  }
+
+  fun getResponseData(): ByteArray {
+    if (showingResponsePacket == null) return EMPTY_DATA
+    // Decodedタブからデータを取得
+    return responsePane.getDecodedData()
+  }
+}

@@ -60,8 +60,8 @@ class SecurityHeadersExtension : Extension() {
       listOf(
         CspCheck(),
         XssProtectionCheck(),
-        HstsCheck(),
         ContentTypeCheck(),
+        HstsCheck(),
         CacheControlCheck(),
         CookieCheck(),
         CorsCheck(),

@@ -16,6 +16,8 @@
 package packetproxy.extensions.securityheaders.checks
 
 import packetproxy.extensions.securityheaders.SecurityCheck
+import packetproxy.extensions.securityheaders.SecurityCheck.HighlightSegment
+import packetproxy.extensions.securityheaders.SecurityCheck.HighlightType
 import packetproxy.extensions.securityheaders.SecurityCheckResult
 import packetproxy.http.HttpHeader
 
@@ -34,7 +36,6 @@ class CookieCheck : SecurityCheck {
   override val name: String = "Cookies"
   override val columnName: String = "Cookies"
   override val failMessage: String = "Set-Cookie is missing 'Secure' flag"
-  override val greenPatterns: List<String> = listOf("set-cookie:", "secure")
 
   override fun check(header: HttpHeader, context: MutableMap<String, Any>): SecurityCheckResult {
     val setCookies = header.getAllValue("Set-Cookie")
@@ -54,9 +55,7 @@ class CookieCheck : SecurityCheck {
         allSecure = false
       }
 
-      // Truncate for display
-      val truncated = if (cookie.length > 100) cookie.substring(0, 100) + "..." else cookie
-      displayBuilder.append(truncated).append("; ")
+      displayBuilder.append(cookie).append("; ")
     }
 
     val displayValue = displayBuilder.toString()
@@ -71,5 +70,24 @@ class CookieCheck : SecurityCheck {
 
   override fun matchesHeaderLine(headerLine: String): Boolean {
     return headerLine.startsWith("set-cookie:")
+  }
+
+  /**
+   * Highlight each Set-Cookie line based on whether it has the Secure flag.
+   * - Secure flag present: GREEN (secure)
+   * - Secure flag missing: RED (insecure)
+   */
+  override fun getHighlightSegments(
+    headerLine: String,
+    result: SecurityCheckResult?,
+  ): List<HighlightSegment> {
+    if (!matchesHeaderLine(headerLine.lowercase())) {
+      return emptyList()
+    }
+
+    val hasSecure = headerLine.lowercase().contains(" secure")
+    val highlightType = if (hasSecure) HighlightType.GREEN else HighlightType.RED
+
+    return listOf(HighlightSegment(0, headerLine.length, highlightType))
   }
 }

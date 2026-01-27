@@ -29,7 +29,21 @@ class CookieCheck : SecurityCheck {
     /** Check if a specific cookie line has the Secure flag */
     @JvmStatic
     fun hasSecureFlag(cookieLine: String): Boolean {
-      return cookieLine.lowercase().contains("secure")
+      val cookieContent = cookieLine.substringAfter(":", cookieLine).trim()
+
+      if (cookieContent.isEmpty()) {
+        return false
+      }
+
+      val parts = cookieContent.split(";")
+
+      return parts
+        .drop(1)
+        .map { it.trim().lowercase() }
+        .any { attr ->
+          val attrName = attr.split("=").first().trim()
+          attrName == "secure"
+        }
     }
   }
 
@@ -51,7 +65,7 @@ class CookieCheck : SecurityCheck {
     val displayBuilder = StringBuilder()
 
     for (cookie in setCookies) {
-      if (!cookie.lowercase().contains(" secure")) {
+      if (!hasSecureFlag(cookie)) {
         allSecure = false
       }
 
@@ -85,7 +99,7 @@ class CookieCheck : SecurityCheck {
       return emptyList()
     }
 
-    val hasSecure = headerLine.lowercase().contains(" secure")
+    val hasSecure = hasSecureFlag(headerLine)
     val highlightType = if (hasSecure) HighlightType.GREEN else HighlightType.RED
 
     return listOf(HighlightSegment(0, headerLine.length, highlightType))

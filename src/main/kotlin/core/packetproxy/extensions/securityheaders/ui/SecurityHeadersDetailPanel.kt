@@ -21,9 +21,11 @@ import javax.swing.JSplitPane
 import javax.swing.JTextPane
 import javax.swing.text.SimpleAttributeSet
 import javax.swing.text.StyledDocument
+import packetproxy.common.FontManager
 import packetproxy.extensions.securityheaders.SecurityCheck
 import packetproxy.extensions.securityheaders.SecurityCheckResult
 import packetproxy.extensions.securityheaders.checks.CookieCheck
+import packetproxy.gui.WrapEditorKit
 import packetproxy.http.HttpHeader
 
 /**
@@ -38,17 +40,8 @@ class SecurityHeadersDetailPanel(private val securityChecks: List<SecurityCheck>
   init {
     textStyles = TextStyles()
 
-    headerPane =
-      JTextPane().apply {
-        isEditable = false
-        background = Color.WHITE
-      }
-
-    detailArea =
-      JTextPane().apply {
-        isEditable = false
-        background = Color.WHITE
-      }
+    headerPane = createWrappedTextPane()
+    detailArea = createWrappedTextPane()
   }
 
   fun createPanel(): JSplitPane {
@@ -106,6 +99,15 @@ class SecurityHeadersDetailPanel(private val securityChecks: List<SecurityCheck>
       }
     } catch (e: Exception) {
       e.printStackTrace()
+    }
+  }
+
+  private fun createWrappedTextPane(): JTextPane {
+    return JTextPane().apply {
+      isEditable = false
+      background = Color.WHITE
+      setEditorKit(WrapEditorKit(byteArrayOf()))
+      font = FontManager.getInstance().font
     }
   }
 

@@ -16,6 +16,8 @@
 package packetproxy.extensions.securityheaders.checks
 
 import packetproxy.extensions.securityheaders.SecurityCheck
+import packetproxy.extensions.securityheaders.SecurityCheck.HighlightSegment
+import packetproxy.extensions.securityheaders.SecurityCheck.HighlightType
 import packetproxy.extensions.securityheaders.SecurityCheckResult
 import packetproxy.http.HttpHeader
 
@@ -27,14 +29,27 @@ class CookieCheck : SecurityCheck {
     /** Check if a specific cookie line has the Secure flag */
     @JvmStatic
     fun hasSecureFlag(cookieLine: String): Boolean {
-      return cookieLine.lowercase().contains("secure")
+      val cookieContent = cookieLine.substringAfter(":", cookieLine).trim()
+
+      if (cookieContent.isEmpty()) {
+        return false
+      }
+
+      val parts = cookieContent.split(";")
+
+      return parts
+        .drop(1)
+        .map { it.trim().lowercase() }
+        .any { attr ->
+          val attrName = attr.split("=").first().trim()
+          attrName == "secure"
+        }
     }
   }
 
   override val name: String = "Cookies"
   override val columnName: String = "Cookies"
   override val failMessage: String = "Set-Cookie is missing 'Secure' flag"
-  override val greenPatterns: List<String> = listOf("set-cookie:", "secure")
 
   override fun check(header: HttpHeader, context: MutableMap<String, Any>): SecurityCheckResult {
     val setCookies = header.getAllValue("Set-Cookie")
@@ -50,13 +65,11 @@ class CookieCheck : SecurityCheck {
     val displayBuilder = StringBuilder()
 
     for (cookie in setCookies) {
-      if (!cookie.lowercase().contains(" secure")) {
+      if (!hasSecureFlag(cookie)) {
         allSecure = false
       }
 
-      // Truncate for display
-      val truncated = if (cookie.length > 100) cookie.substring(0, 100) + "..." else cookie
-      displayBuilder.append(truncated).append("; ")
+      displayBuilder.append(cookie).append("; ")
     }
 
     val displayValue = displayBuilder.toString()
@@ -71,5 +84,24 @@ class CookieCheck : SecurityCheck {
 
   override fun matchesHeaderLine(headerLine: String): Boolean {
     return headerLine.startsWith("set-cookie:")
+  }
+
+  /**
+   * Highlight each Set-Cookie line based on whether it has the Secure flag.
+   * - Secure flag present: GREEN (secure)
+   * - Secure flag missing: RED (insecure)
+   */
+  override fun getHighlightSegments(
+    headerLine: String,
+    result: SecurityCheckResult?,
+  ): List<HighlightSegment> {
+    if (!matchesHeaderLine(headerLine.lowercase())) {
+      return emptyList()
+    }
+
+    val hasSecure = hasSecureFlag(headerLine)
+    val highlightType = if (hasSecure) HighlightType.GREEN else HighlightType.RED
+
+    return listOf(HighlightSegment(0, headerLine.length, highlightType))
   }
 }

@@ -255,12 +255,12 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
   }
 
   /** リクエスト/レスポンス分割表示モード用：両方のパケットを設定 HTTP通信で使用 */
-  fun setPackets(requestPacket: Packet, responsePacket: Packet) {
+  fun setPackets(requestPacket: Packet, responsePacket: Packet?) {
     showingRequestPacket = requestPacket
     showingResponsePacket = responsePacket
     switchToSplitView()
     updateRequestPanel()
-    updateResponsePanel()
+    updateResponsePanel() // responsePacketがnullの場合、clear()が呼ばれる
   }
 
   private fun switchToSplitView() {

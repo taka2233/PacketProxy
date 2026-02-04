@@ -111,10 +111,17 @@ public class GUIPacket {
 			}
 			request_response_panel.setPackets(showing_packet, showing_response_packet);
 		} else {
-			// マージされていない → 単一パケット表示
+			// マージされていない
 			showing_packet = packet;
 			showing_response_packet = null;
-			request_response_panel.setSinglePacket(packet);
+
+			// リクエストパケットの場合は分割表示（Responseは空白）
+			// レスポンスパケットの場合は単一パケット表示
+			if (packet.getDirection() == Packet.Direction.CLIENT) {
+				request_response_panel.setPackets(packet, null);
+			} else {
+				request_response_panel.setSinglePacket(packet);
+			}
 		}
 	}
 

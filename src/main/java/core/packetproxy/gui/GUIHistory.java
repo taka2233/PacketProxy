@@ -730,6 +730,16 @@ public class GUIHistory implements PropertyChangeListener {
 						: packet.getModifiedData();
 				tableModel.setValueAt(currentLength + responseData.length, rowIndex, 3);
 
+				// Type列を更新
+				// リクエストパケットのContent-Typeが空の場合、レスポンスパケットのContent-Typeを使用
+				// （DBへの保存タイミングの問題で、リクエストのContent-Typeがまだ更新されていない場合があるため）
+				Packet requestPacket = packets.query(requestPacketId);
+				String contentType = requestPacket.getContentType();
+				if (contentType == null || contentType.isEmpty()) {
+					contentType = packet.getContentType();
+				}
+				tableModel.setValueAt(contentType, rowIndex, 11);
+
 				// マッピングを更新
 				pairingService.markGroupHasResponse(groupId);
 				pairingService.registerPairing(positiveValue, requestPacketId);
@@ -737,7 +747,6 @@ public class GUIHistory implements PropertyChangeListener {
 
 				// 選択中のパケットがマージされた場合、詳細表示を強制更新
 				if (requestPacketId == getSelectedPacketId()) {
-					Packet requestPacket = packets.query(requestPacketId);
 					gui_packet.setPacket(requestPacket, true);
 				}
 			} else {
@@ -935,6 +944,15 @@ public class GUIHistory implements PropertyChangeListener {
 						: packet.getModifiedData();
 				tableModel.setValueAt(currentLength + responseData.length, rowIndex, 3);
 
+				// Type列を更新
+				// リクエストパケットのContent-Typeが空の場合、レスポンスパケットのContent-Typeを使用
+				Packet requestPacket = packets.query(requestPacketId);
+				String contentType = requestPacket.getContentType();
+				if (contentType == null || contentType.isEmpty()) {
+					contentType = packet.getContentType();
+				}
+				tableModel.setValueAt(contentType, rowIndex, 11);
+
 				// マッピングを更新
 				pairingService.markGroupHasResponse(groupId);
 				pairingService.registerPairing(packet.getId(), requestPacketId);
@@ -1110,7 +1128,7 @@ public class GUIHistory implements PropertyChangeListener {
 			Integer row_index = id_row.get(packetId);
 			if (row_index != null) {
 
-				// Server Response列のみ更新
+				// Server Response列を更新
 				tableModel.setValueAt(packet.getSummarizedResponse(), row_index, 2);
 				// Length列を再計算
 				int requestPacketId = pairingService.getRequestIdForResponse(packetId);
@@ -1122,6 +1140,13 @@ public class GUIHistory implements PropertyChangeListener {
 						? packet.getDecodedData()
 						: packet.getModifiedData();
 				tableModel.setValueAt(requestData.length + responseData.length, row_index, 3);
+				// Type列を更新
+				// リクエストパケットのContent-Typeが空の場合、レスポンスパケットのContent-Typeを使用
+				String contentType = requestPacket.getContentType();
+				if (contentType == null || contentType.isEmpty()) {
+					contentType = packet.getContentType();
+				}
+				tableModel.setValueAt(contentType, row_index, 11);
 			}
 			return;
 		}

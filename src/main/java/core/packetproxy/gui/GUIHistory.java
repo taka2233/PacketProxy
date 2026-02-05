@@ -699,6 +699,10 @@ public class GUIHistory implements PropertyChangeListener {
 			int packetCount = 0;
 			if (groupId != 0) {
 				packetCount = pairingService.incrementGroupPacketCount(groupId);
+				// CLIENTパケットの場合はCLIENTカウントもインクリメント（ストリーミング判定用）
+				if (!isResponse) {
+					pairingService.incrementGroupClientPacketCount(groupId);
+				}
 			}
 
 			// レスポンスをリクエスト行にマージする条件：

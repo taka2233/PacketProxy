@@ -115,11 +115,18 @@ public class GUIPacket {
 			showing_packet = packet;
 			showing_response_packet = null;
 
-			// リクエストパケットの場合は分割表示（Responseは空白）
-			// レスポンスパケットの場合は単一パケット表示
-			if (packet.getDirection() == Packet.Direction.CLIENT) {
+			// ストリーミング判定（同一Group IDでCLIENTパケットが2つ以上存在する場合）
+			long groupId = packet.getGroup();
+			boolean isStreaming = groupId != 0 && pairingService.isGroupStreaming(groupId);
+
+			if (isStreaming) {
+				// ストリーミングは単一パケット表示
+				request_response_panel.setSinglePacket(packet);
+			} else if (packet.getDirection() == Packet.Direction.CLIENT) {
+				// 通常リクエストは分割表示（Responseは空白）
 				request_response_panel.setPackets(packet, null);
 			} else {
+				// レスポンスパケットは単一パケット表示
 				request_response_panel.setSinglePacket(packet);
 			}
 		}

@@ -34,6 +34,8 @@ class PacketPairingService {
   private val requestToResponseId: MutableMap<Int, Int> = ConcurrentHashMap()
   // グループIDごとのパケット数（3個以上でマージしない）
   private val groupPacketCount: MutableMap<Long, Int> = ConcurrentHashMap()
+  // グループIDごとのCLIENTパケット数（2個以上でストリーミングと判定）
+  private val groupClientPacketCount: MutableMap<Long, Int> = ConcurrentHashMap()
 
   /** すべてのペアリング情報をクリアする */
   fun clear() {
@@ -42,6 +44,7 @@ class PacketPairingService {
     responseToRequestId.clear()
     requestToResponseId.clear()
     groupPacketCount.clear()
+    groupClientPacketCount.clear()
   }
 
   /**
@@ -196,5 +199,36 @@ class PacketPairingService {
       requestToResponseId.remove(requestPacketId)
     }
     return responsePacketId
+  }
+
+  /**
+   * グループのCLIENTパケット数をインクリメントする
+   *
+   * @param groupId グループID
+   * @return インクリメント後のCLIENTパケット数
+   */
+  fun incrementGroupClientPacketCount(groupId: Long): Int {
+    return groupClientPacketCount.compute(groupId) { _, currentCount -> (currentCount ?: 0) + 1 }
+      ?: 0
+  }
+
+  /**
+   * グループのCLIENTパケット数を取得する
+   *
+   * @param groupId グループID
+   * @return CLIENTパケット数
+   */
+  fun getGroupClientPacketCount(groupId: Long): Int {
+    return groupClientPacketCount[groupId] ?: 0
+  }
+
+  /**
+   * グループがストリーミングかどうかを判定する CLIENTパケット数が2以上の場合はストリーミングと判定
+   *
+   * @param groupId グループID
+   * @return ストリーミングの場合true
+   */
+  fun isGroupStreaming(groupId: Long): Boolean {
+    return getGroupClientPacketCount(groupId) >= 2
   }
 }

@@ -60,8 +60,8 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
   }
 
   private enum class TabType(val index: Int) {
-    DECODED(0),
-    RECEIVED(1),
+    RECEIVED(0),
+    DECODED(1),
     MODIFIED(2),
     ENCODED(3),
     ALL(4);
@@ -145,8 +145,8 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
         panel.minimumSize = Dimension(MIN_PANEL_SIZE, MIN_PANEL_SIZE)
       }
 
-      tabs.addTab("Decoded", decodedTabs.tabPanel)
       tabs.addTab("Received Packet", receivedPanel.createPanel())
+      tabs.addTab("Decoded", decodedTabs.tabPanel)
       tabs.addTab("Modified", modifiedPanel.createPanel())
       tabs.addTab("Encoded (Sent Packet)", sentPanel.createPanel())
       tabs.addTab("All", createAllPanel())
@@ -260,7 +260,7 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
     showingResponsePacket = responsePacket
     switchToSplitView()
     updateRequestPanel()
-    updateResponsePanel() // responsePacketがnullの場合、clear()が呼ばれる
+    updateResponsePanel()
   }
 
   private fun switchToSplitView() {

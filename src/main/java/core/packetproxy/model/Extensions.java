@@ -31,6 +31,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import javax.swing.JOptionPane;
@@ -85,6 +86,12 @@ public class Extensions implements PropertyChangeListener {
 			Extension extension = (Extension) constructor.newInstance();
 			create(extension);
 		}
+
+		// load extensions via SPI
+		ServiceLoader<Extension> loader = ServiceLoader.load(Extension.class);
+		for (Extension extension : loader) {
+			create(extension);
+		}
 	}
 
 	public void addPropertyChangeListener(PropertyChangeListener listener) {
@@ -111,6 +118,19 @@ public class Extensions implements PropertyChangeListener {
 			}
 			return extension;
 		}
+
+		// SPI経由でロードされた拡張機能を名前で検索
+		ServiceLoader<Extension> loader = ServiceLoader.load(Extension.class);
+		for (Extension extension : loader) {
+			if (extension.getName().equals(name)) {
+				return extension;
+			}
+		}
+
+		if (path == null || path.isEmpty()) {
+			return null;
+		}
+
 		try {
 
 			File file = new File(path);

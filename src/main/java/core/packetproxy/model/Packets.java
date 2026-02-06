@@ -188,6 +188,10 @@ public class Packets implements PropertyChangeListener {
 				.query();
 	}
 
+	public List<Packet> queryByGroup(long group) throws Exception {
+		return dao.queryBuilder().orderBy("id", true).where().eq("group", group).query();
+	}
+
 	public void firePropertyChange() {
 		changes.firePropertyChange(PACKETS.toString(), null, null);
 	}

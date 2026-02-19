@@ -345,6 +345,30 @@ public class GUIHistoryContextMenuFactory {
 			}
 		});
 
+		JMenuItem copyForSpreadsheet = createMenuItem("copy for spreadsheet", -1, null, e -> {
+			try {
+				Packet packet = gui_packet.getPacket();
+				if (packet == null) {
+					return;
+				}
+
+				long group = packet.getGroup();
+				List<Packet> groupPackets = packets.queryByGroup(group);
+
+				SpreadsheetCopyFormatter formatter = new SpreadsheetCopyFormatter();
+				CharSetUtility charsetutil = CharSetUtility.getInstance();
+				boolean isStreaming = formatter.isStreamingCommunication(groupPackets);
+				String copyData = formatter.buildCopyData(packet, groupPackets, packet.getDirection(), isStreaming,
+						charsetutil);
+
+				Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+				StringSelection selection = new StringSelection(copyData);
+				clipboard.setContents(selection, selection);
+			} catch (Exception ex) {
+				errWithStackTrace(ex);
+			}
+		});
+
 		menu.add(send);
 		menu.add(sendToResender);
 		menu.add(copyAll);
@@ -357,6 +381,7 @@ public class GUIHistoryContextMenuFactory {
 		menu.add(addColorY);
 		menu.add(clearColor);
 		menu.add(copyAsCurl);
+		menu.add(copyForSpreadsheet);
 		menu.add(delete_selected_items);
 		menu.add(delete_all);
 

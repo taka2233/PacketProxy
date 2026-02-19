@@ -161,6 +161,13 @@ public class Packets implements PropertyChangeListener {
 		return dao.queryBuilder().orderBy("id", true).query();
 	}
 
+	public List<Packet> queryByGroup(long group) throws Exception {
+		com.j256.ormlite.stmt.QueryBuilder<Packet, Integer> queryBuilder = dao.queryBuilder();
+		queryBuilder.orderBy("id", true);
+		queryBuilder.where().eq("group", group);
+		return queryBuilder.query();
+	}
+
 	public List<Packet> queryMoreThan(int date) throws Exception {
 		return dao.queryBuilder().where().gt("id", date).query();
 	}

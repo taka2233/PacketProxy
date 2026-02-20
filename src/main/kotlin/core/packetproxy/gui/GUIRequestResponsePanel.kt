@@ -77,6 +77,9 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
   private lateinit var cardLayout: CardLayout
   private lateinit var splitPane: JSplitPane
 
+  private lateinit var buttonPanel: JPanel
+  private lateinit var buttonCardLayout: CardLayout
+
   private lateinit var requestPane: PacketDetailPane
   private lateinit var responsePane: PacketDetailPane
   private lateinit var singlePane: PacketDetailPane
@@ -111,7 +114,16 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
     singlePane.addChangeListener(ChangeListener { updateSinglePacketPanel() })
     mainPanel.add(singlePane.panel, ViewType.SINGLE.name)
 
-    return mainPanel
+    // === 共有ボタンパネル（分割表示の対象外・下部に1つだけ表示）===
+    buttonCardLayout = CardLayout()
+    buttonPanel = JPanel(buttonCardLayout)
+    buttonPanel.add(requestPane.receivedPanel.createButtonPanel(), ViewType.SPLIT.name)
+    buttonPanel.add(singlePane.receivedPanel.createButtonPanel(), ViewType.SINGLE.name)
+
+    val wrapper = JPanel(BorderLayout())
+    wrapper.add(mainPanel, BorderLayout.CENTER)
+    wrapper.add(buttonPanel, BorderLayout.SOUTH)
+    return wrapper
   }
 
   private inner class PacketDetailPane(
@@ -122,7 +134,7 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
     val panel: JPanel = JPanel()
     private val tabs = JTabbedPane()
     private val decodedTabs = TabSet(true, false)
-    private val receivedPanel = GUIData(owner)
+    val receivedPanel = GUIData(owner)
     private val modifiedPanel = GUIData(owner)
     private val sentPanel = GUIData(owner)
     private lateinit var allReceived: RawTextPane
@@ -145,10 +157,10 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
         panel.minimumSize = Dimension(MIN_PANEL_SIZE, MIN_PANEL_SIZE)
       }
 
-      tabs.addTab("Received Packet", receivedPanel.createPanel())
+      tabs.addTab("Received Packet", receivedPanel.createTabsPanel())
       tabs.addTab("Decoded", decodedTabs.tabPanel)
-      tabs.addTab("Modified", modifiedPanel.createPanel())
-      tabs.addTab("Encoded (Sent Packet)", sentPanel.createPanel())
+      tabs.addTab("Modified", modifiedPanel.createTabsPanel())
+      tabs.addTab("Encoded (Sent Packet)", sentPanel.createTabsPanel())
       tabs.addTab("All", createAllPanel())
 
       panel.add(tabs, BorderLayout.CENTER)
@@ -267,6 +279,7 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
     if (currentView != ViewType.SPLIT) {
       currentView = ViewType.SPLIT
       cardLayout.show(mainPanel, ViewType.SPLIT.name)
+      buttonCardLayout.show(buttonPanel, ViewType.SPLIT.name)
     }
   }
 
@@ -274,6 +287,7 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
     if (currentView != ViewType.SINGLE) {
       currentView = ViewType.SINGLE
       cardLayout.show(mainPanel, ViewType.SINGLE.name)
+      buttonCardLayout.show(buttonPanel, ViewType.SINGLE.name)
     }
   }
 

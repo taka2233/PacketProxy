@@ -29,8 +29,12 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.FlowLayout;
+import java.awt.Rectangle;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JScrollBar;
+import javax.swing.Scrollable;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
@@ -38,8 +42,6 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ScrollPaneConstants;
-import javax.swing.UIManager;
-import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import packetproxy.controller.ResendController;
 import packetproxy.controller.SinglePacketAttackController;
@@ -78,6 +80,12 @@ public class GUIData {
 	}
 
 	public JComponent createPanel() throws Exception {
+		createTabsPanel();
+		main_panel.add(createButtonPanel());
+		return main_panel;
+	}
+
+	public JComponent createTabsPanel() throws Exception {
 		main_panel = new JPanel();
 		main_panel.setLayout(new BoxLayout(main_panel, BoxLayout.Y_AXIS));
 
@@ -85,6 +93,74 @@ public class GUIData {
 
 		main_panel.add(tabs.getTabPanel());
 
+		initButtons();
+		return main_panel;
+	}
+
+	public JComponent createButtonPanel() {
+		JPanel diff_panel = new JPanel();
+		diff_panel.add(diff_orig_button);
+		diff_panel.add(diff_button);
+		diff_panel.add(stop_diff_button);
+		diff_panel.setBorder(new LineBorder(Color.black, 1, true));
+		diff_panel.setLayout(new BoxLayout(diff_panel, BoxLayout.LINE_AXIS));
+
+		JPanel button_panel = new JPanel();
+		button_panel.add(charSetCombo);
+		button_panel.add(copy_url_body_button);
+		button_panel.add(copy_body_button);
+		button_panel.add(copy_url_button);
+		button_panel.add(resend_button);
+		button_panel.add(resend_multiple_button);
+		button_panel.add(attack_button);
+		button_panel.add(send_to_resender_button);
+		button_panel.add(new JLabel("  diff: "));
+		button_panel.add(diff_panel);
+		button_panel.setLayout(new BoxLayout(button_panel, BoxLayout.LINE_AXIS));
+
+		ScrollableCenteredPanel centered_panel = new ScrollableCenteredPanel();
+		centered_panel.add(button_panel);
+		return createButtonScrollPane(centered_panel);
+	}
+
+	/**
+	 * ビューポートが十分に広い場合はボタンを中央寄せし、
+	 * 狭い場合は横スクロールバーを表示するためのパネル。
+	 * getScrollableTracksViewportWidth() でビューポート幅に追従するかを切り替える。
+	 */
+	private static class ScrollableCenteredPanel extends JPanel implements Scrollable {
+
+		ScrollableCenteredPanel() {
+			super(new FlowLayout(FlowLayout.CENTER));
+		}
+
+		@Override
+		public Dimension getPreferredScrollableViewportSize() {
+			return getPreferredSize();
+		}
+
+		@Override
+		public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+			return 20;
+		}
+
+		@Override
+		public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+			return 100;
+		}
+
+		@Override
+		public boolean getScrollableTracksViewportWidth() {
+			return getParent() != null && getParent().getWidth() >= getPreferredSize().width;
+		}
+
+		@Override
+		public boolean getScrollableTracksViewportHeight() {
+			return true;
+		}
+	}
+
+	private void initButtons() throws Exception {
 		copy_url_body_button = new JButton("copy Method+URL+Body");
 		copy_url_body_button.addActionListener(new ActionListener() {
 
@@ -391,30 +467,6 @@ public class GUIData {
 		});
 
 		charSetCombo.setSelectedItem(charSetUtility.getInstance().getCharSetForGUIComponent());
-
-		JPanel diff_panel = new JPanel();
-		diff_panel.add(diff_orig_button);
-		diff_panel.add(diff_button);
-		diff_panel.add(stop_diff_button);
-		diff_panel.setBorder(new LineBorder(Color.black, 1, true));
-		diff_panel.setLayout(new BoxLayout(diff_panel, BoxLayout.LINE_AXIS));
-
-		JPanel button_panel = new JPanel();
-		button_panel.add(charSetCombo);
-		button_panel.add(copy_url_body_button);
-		button_panel.add(copy_body_button);
-		button_panel.add(copy_url_button);
-		button_panel.add(resend_button);
-		button_panel.add(resend_multiple_button);
-		button_panel.add(attack_button);
-		button_panel.add(send_to_resender_button);
-		button_panel.add(new JLabel("  diff: "));
-		button_panel.add(diff_panel);
-		button_panel.setLayout(new BoxLayout(button_panel, BoxLayout.LINE_AXIS));
-
-		var button_scroll_pane = createButtonScrollPane(button_panel);
-		main_panel.add(button_scroll_pane);
-		return main_panel;
 	}
 
 	public void updateCharSetCombo() {
@@ -431,12 +483,20 @@ public class GUIData {
 	}
 
 	static JScrollPane createButtonScrollPane(JPanel buttonPanel) {
-		var scrollBarThickness = UIManager.getInt("ScrollBar.width");
-		if (scrollBarThickness > 0) {
-			buttonPanel.setBorder(new EmptyBorder(0, 0, scrollBarThickness, 0));
-		}
-		var scrollPane = new JScrollPane(buttonPanel, ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
-				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+		JScrollPane scrollPane = new JScrollPane(buttonPanel, ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER,
+				ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED) {
+			@Override
+			public Dimension getPreferredSize() {
+				Dimension d = super.getPreferredSize();
+				JScrollBar hBar = getHorizontalScrollBar();
+				// スクロールバーが表示されている場合のみ高さを加算することで、
+				// 非表示時の余分なスペースを排除しつつ、表示時はレイアウトを押し下げて領域を確保する
+				if (hBar != null && hBar.isVisible()) {
+					d.height += hBar.getPreferredSize().height;
+				}
+				return d;
+			}
+		};
 		scrollPane.setBorder(null);
 		scrollPane.getViewport().addComponentListener(new ComponentAdapter() {
 			@Override

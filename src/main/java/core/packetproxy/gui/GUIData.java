@@ -20,6 +20,7 @@ import static packetproxy.util.Logging.log;
 
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
@@ -29,7 +30,6 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.FlowLayout;
 import java.awt.Rectangle;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;

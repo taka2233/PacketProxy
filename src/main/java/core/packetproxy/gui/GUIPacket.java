@@ -15,12 +15,9 @@
  */
 package packetproxy.gui;
 
-import static packetproxy.util.Logging.errWithStackTrace;
-
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import packetproxy.model.Packet;
-import packetproxy.model.Packets;
 
 public class GUIPacket {
 
@@ -29,7 +26,6 @@ public class GUIPacket {
 	private GUIRequestResponsePanel request_response_panel;
 	private Packet showing_packet;
 	private Packet showing_response_packet;
-	private PacketPairingService pairingService;
 
 	public static GUIPacket getInstance() throws Exception {
 		if (instance == null) {
@@ -43,7 +39,6 @@ public class GUIPacket {
 		this.owner = GUIHistory.getOwner();
 		this.showing_packet = null;
 		this.showing_response_packet = null;
-		this.pairingService = null;
 	}
 
 	public JComponent createPanel() throws Exception {
@@ -65,7 +60,7 @@ public class GUIPacket {
 	}
 
 	public void setPacket(Packet packet) {
-		setPacket(packet, false);
+		setSinglePacket(packet, false);
 	}
 
 	/**
@@ -77,59 +72,33 @@ public class GUIPacket {
 	 *            trueの場合、同じパケットIDでも強制的に再描画する
 	 */
 	public void setPacket(Packet packet, boolean forceRefresh) {
-		if (!forceRefresh && showing_packet != null && showing_packet.getId() == packet.getId()) {
+		setSinglePacket(packet, forceRefresh);
+	}
 
+	public void setPackets(Packet requestPacket, Packet responsePacket) {
+		setPackets(requestPacket, responsePacket, false);
+	}
+
+	public void setPackets(Packet requestPacket, Packet responsePacket, boolean forceRefresh) {
+		if (!forceRefresh && isSameRequestResponse(requestPacket, responsePacket)) {
 			return;
 		}
+		showing_packet = requestPacket;
+		showing_response_packet = responsePacket;
+		request_response_panel.setPackets(requestPacket, responsePacket);
+	}
 
-		// パケットのペアリング状態から表示モードを判断
-		if (pairingService == null) {
-			throw new IllegalStateException("PacketPairingService is not set");
+	public void setSinglePacket(Packet packet) {
+		setSinglePacket(packet, false);
+	}
+
+	public void setSinglePacket(Packet packet, boolean forceRefresh) {
+		if (!forceRefresh && isSameSinglePacket(packet)) {
+			return;
 		}
-		int responsePacketId = pairingService.getResponsePacketIdForRequest(packet.getId());
-
-		if (responsePacketId != -1) {
-			// マージされている → リクエスト/レスポンス分割表示
-			showing_packet = packet;
-			try {
-				showing_response_packet = Packets.getInstance().query(responsePacketId);
-			} catch (Exception e) {
-				errWithStackTrace(e);
-				showing_response_packet = null;
-			}
-			request_response_panel.setPackets(showing_packet, showing_response_packet);
-		} else if (pairingService.containsResponsePairing(packet.getId())) {
-			// このパケット自体がレスポンスとしてマージされている → リクエストを取得して分割表示
-			int requestPacketId = pairingService.getRequestIdForResponse(packet.getId());
-			try {
-				showing_packet = Packets.getInstance().query(requestPacketId);
-				showing_response_packet = packet;
-			} catch (Exception e) {
-				errWithStackTrace(e);
-				showing_packet = null;
-				showing_response_packet = packet;
-			}
-			request_response_panel.setPackets(showing_packet, showing_response_packet);
-		} else {
-			// マージされていない
-			showing_packet = packet;
-			showing_response_packet = null;
-
-			// ストリーミング判定（同一Group IDでCLIENTパケットが2つ以上存在する場合）
-			long groupId = packet.getGroup();
-			boolean isStreaming = groupId != 0 && pairingService.isGroupStreaming(groupId);
-
-			if (isStreaming) {
-				// ストリーミングは単一パケット表示
-				request_response_panel.setSinglePacket(packet);
-			} else if (packet.getDirection() == Packet.Direction.CLIENT) {
-				// 通常リクエストは分割表示（Responseは空白）
-				request_response_panel.setPackets(packet, null);
-			} else {
-				// レスポンスパケットは単一パケット表示
-				request_response_panel.setSinglePacket(packet);
-			}
-		}
+		showing_packet = packet;
+		showing_response_packet = null;
+		request_response_panel.setSinglePacket(packet);
 	}
 
 	public Packet getPacket() {
@@ -140,7 +109,20 @@ public class GUIPacket {
 		return showing_response_packet;
 	}
 
-	public void setPairingService(PacketPairingService pairingService) {
-		this.pairingService = pairingService;
+	private boolean isSameSinglePacket(Packet packet) {
+		return showing_packet != null && showing_response_packet == null && showing_packet.getId() == packet.getId();
+	}
+
+	private boolean isSameRequestResponse(Packet requestPacket, Packet responsePacket) {
+		if (showing_packet == null || requestPacket == null) {
+			return false;
+		}
+		if (showing_packet.getId() != requestPacket.getId()) {
+			return false;
+		}
+		if (showing_response_packet == null || responsePacket == null) {
+			return showing_response_packet == null && responsePacket == null;
+		}
+		return showing_response_packet.getId() == responsePacket.getId();
 	}
 }

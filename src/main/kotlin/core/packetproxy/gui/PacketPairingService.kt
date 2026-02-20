@@ -15,9 +15,13 @@
  */
 package packetproxy.gui
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.HashMap
 
-/** リクエストとレスポンスのパケットペアリングを管理するサービス。GUIHistoryとGUIPacket間の循環依存を解消するために抽出されたクラス。 */
+/**
+ * リクエストとレスポンスのパケットペアリングを管理するサービス。
+ *
+ * GUIHistory から EDT 上でのみ呼び出される前提のため、同期コレクションは使用しない。
+ */
 class PacketPairingService {
   private companion object {
     private const val NO_RESPONSE_PACKET_ID = -1
@@ -25,17 +29,17 @@ class PacketPairingService {
   }
 
   // グループIDと行番号のマッピング（リクエスト行を追跡）
-  private val groupRow: MutableMap<Long, Int> = ConcurrentHashMap()
+  private val groupRow: MutableMap<Long, Int> = HashMap()
   // レスポンスが既にマージされているグループID
-  private val groupHasResponse = ConcurrentHashMap.newKeySet<Long>()
+  private val groupHasResponse = mutableSetOf<Long>()
   // レスポンスパケットIDとリクエストパケットIDのマッピング（マージされた行用）
-  private val responseToRequestId: MutableMap<Int, Int> = ConcurrentHashMap()
+  private val responseToRequestId: MutableMap<Int, Int> = HashMap()
   // リクエストパケットIDとレスポンスパケットIDのマッピング（マージされた行用）
-  private val requestToResponseId: MutableMap<Int, Int> = ConcurrentHashMap()
+  private val requestToResponseId: MutableMap<Int, Int> = HashMap()
   // グループIDごとのパケット数（3個以上でマージしない）
-  private val groupPacketCount: MutableMap<Long, Int> = ConcurrentHashMap()
+  private val groupPacketCount: MutableMap<Long, Int> = HashMap()
   // グループIDごとのCLIENTパケット数（2個以上でストリーミングと判定）
-  private val groupClientPacketCount: MutableMap<Long, Int> = ConcurrentHashMap()
+  private val groupClientPacketCount: MutableMap<Long, Int> = HashMap()
 
   /** すべてのペアリング情報をクリアする */
   fun clear() {
@@ -235,5 +239,19 @@ class PacketPairingService {
    */
   fun isGroupStreaming(groupId: Long): Boolean {
     return getGroupClientPacketCount(groupId) >= 2
+  }
+
+  /**
+   * groupId が後から確定したリクエストを追跡対象に追加する。
+   *
+   * encoder.setGroupId() 後の遅延登録で使用するため、 groupRow と groupPacketCount の初期化を同一メソッドに集約する。
+   */
+  fun ensureGroupTracked(groupId: Long, rowIndex: Int) {
+    if (!containsGroup(groupId)) {
+      registerGroupRow(groupId, rowIndex)
+    }
+    if (getGroupPacketCount(groupId) == 0) {
+      incrementGroupPacketCount(groupId)
+    }
   }
 }

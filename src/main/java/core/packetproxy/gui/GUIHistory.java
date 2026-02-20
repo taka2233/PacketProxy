@@ -83,6 +83,11 @@ import packetproxy.model.ResenderPackets;
 
 public class GUIHistory implements PropertyChangeListener {
 
+	private static final int COL_ID = 0;
+	private static final int COL_SERVER_RESPONSE = 2;
+	private static final int COL_LENGTH = 3;
+	private static final int COL_CONTENT_TYPE = 11;
+
 	private static GUIHistory instance;
 	private static JFrame owner;
 
@@ -144,7 +149,6 @@ public class GUIHistory implements PropertyChangeListener {
 		Filters.getInstance().addPropertyChangeListener(this);
 		pairingService = new PacketPairingService();
 		gui_packet = GUIPacket.getInstance();
-		gui_packet.setPairingService(pairingService);
 		colorManager = new TableCustomColorManager();
 		preferredPosition = 0;
 		update_packet_ids = new HashSet<Integer>();
@@ -162,7 +166,7 @@ public class GUIHistory implements PropertyChangeListener {
 
 			for (int i = 0; i < table.getRowCount(); i++) {
 
-				int id = (int) table.getValueAt(i, 0);
+				int id = (int) table.getValueAt(i, COL_ID);
 				if (id == preferredPosition) {
 
 					table.changeSelection(i, 0, false, false);
@@ -373,7 +377,7 @@ public class GUIHistory implements PropertyChangeListener {
 						selected = (table.getSelectedRow() == row);
 						first_selected = selected;
 					}
-					int packetId = (int) table.getValueAt(row, 0);
+					int packetId = (int) table.getValueAt(row, COL_ID);
 					boolean modified = (boolean) table.getValueAt(row,
 							table.getColumnModel().getColumnIndex("Modified"));
 					boolean resend = (boolean) table.getValueAt(row, table.getColumnModel().getColumnIndex("Resend"));
@@ -548,7 +552,7 @@ public class GUIHistory implements PropertyChangeListener {
 							Thread.sleep(100);
 							packet = packets.query(packetId);
 						}
-						gui_packet.setPacket(packet);
+						resolveAndShowPacket(packet, false);
 					}
 				} catch (Exception e1) {
 
@@ -594,7 +598,7 @@ public class GUIHistory implements PropertyChangeListener {
 		int idx = table.getSelectedRow();
 		if (0 <= idx && idx < table.getRowCount()) {
 
-			return (Integer) table.getValueAt(idx, 0);
+			return (Integer) table.getValueAt(idx, COL_ID);
 		} else {
 
 			return 0;
@@ -688,88 +692,148 @@ public class GUIHistory implements PropertyChangeListener {
 	}
 
 	private void handleIntegerPacketValue(int value) throws Exception {
-		if (value < 0) {
-
-			int positiveValue = value * -1;
-			Packet packet = packets.query(positiveValue);
-			long groupId = packet.getGroup();
-			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
-
-			// グループIDが設定されている場合、パケット数をカウント
-			int packetCount = 0;
-			if (groupId != 0) {
-				packetCount = pairingService.incrementGroupPacketCount(groupId);
-				// CLIENTパケットの場合はCLIENTカウントもインクリメント（ストリーミング判定用）
-				if (!isResponse) {
-					pairingService.incrementGroupClientPacketCount(groupId);
-				}
-			}
-
-			// レスポンスをリクエスト行にマージする条件：
-			// - グループIDが設定されている
-			// - 同じグループのリクエスト行が存在する
-			// - まだレスポンスがマージされていない
-			// - グループのパケット数が2以下（3個以上はストリーミング等なのでマージしない）
-			boolean containsGroup = pairingService.containsGroup(groupId);
-			boolean hasResponse = pairingService.hasResponse(groupId);
-			boolean isMergeable = pairingService.isGroupMergeable(groupId);
-			boolean shouldMerge = isResponse && groupId != 0 && containsGroup && !hasResponse && isMergeable;
-
-			// パケット数が3になった時点で、既存のマージを解除する（ストリーミング通信対応）
-			if (packetCount == 3 && hasResponse && containsGroup) {
-				unmergeExistingPairing(groupId);
-			}
-
-			if (shouldMerge) {
-
-				int rowIndex = pairingService.getRowForGroup(groupId);
-				int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
-
-				// Server Response列を更新
-				tableModel.setValueAt(packet.getSummarizedResponse(), rowIndex, 2);
-				// Length列を更新（リクエスト + レスポンスの合計）
-				int currentLength = (Integer) tableModel.getValueAt(rowIndex, 3);
-				byte[] responseData = packet.getDecodedData().length > 0
-						? packet.getDecodedData()
-						: packet.getModifiedData();
-				tableModel.setValueAt(currentLength + responseData.length, rowIndex, 3);
-
-				// Type列を更新
-				// リクエストパケットのContent-Typeが空の場合、レスポンスパケットのContent-Typeを使用
-				// （DBへの保存タイミングの問題で、リクエストのContent-Typeがまだ更新されていない場合があるため）
-				Packet requestPacket = packets.query(requestPacketId);
-				String contentType = requestPacket.getContentType();
-				if (contentType == null || contentType.isEmpty()) {
-					contentType = packet.getContentType();
-				}
-				tableModel.setValueAt(contentType, rowIndex, 11);
-
-				// マッピングを更新
-				pairingService.markGroupHasResponse(groupId);
-				pairingService.registerPairing(positiveValue, requestPacketId);
-				id_row.put(positiveValue, rowIndex);
-
-				// 選択中のパケットがマージされた場合、詳細表示を強制更新
-				if (requestPacketId == getSelectedPacketId()) {
-					gui_packet.setPacket(requestPacket, true);
-				}
-			} else {
-
-				// 新しい行を追加
-				tableModel.addRow(makeRowDataFromPacket(packet));
-				int rowIndex = tableModel.getRowCount() - 1;
-				id_row.put(positiveValue, rowIndex);
-
-				// リクエストでグループIDがある場合はグループマッピングに追加
-				if (!isResponse && groupId != 0) {
-
-					pairingService.registerGroupRow(groupId, rowIndex);
-				}
-			}
-		} else {
+		if (value >= 0) {
 
 			updateRequestOne(value);
+			return;
 		}
+
+		int packetId = value * -1;
+		Packet packet = packets.query(packetId);
+		long groupId = packet.getGroup();
+		boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
+		int packetCount = countAndTrackPacket(packet);
+		if (shouldUnmergeExisting(packetCount, groupId)) {
+			unmergeExistingPairing(groupId);
+		}
+		if (shouldMergeResponse(groupId, isResponse)) {
+			mergeResponseIntoRequestRow(packet, groupId, packetId, true);
+		} else {
+			addNewRowWithGroupTracking(packet, packetId, isResponse, groupId);
+		}
+	}
+
+	private int countAndTrackPacket(Packet packet) {
+		long groupId = packet.getGroup();
+		if (groupId == 0) {
+			return 0;
+		}
+		int packetCount = pairingService.incrementGroupPacketCount(groupId);
+		if (packet.getDirection() == Packet.Direction.CLIENT) {
+			pairingService.incrementGroupClientPacketCount(groupId);
+		}
+		return packetCount;
+	}
+
+	private boolean shouldMergeResponse(long groupId, boolean isResponse) {
+		if (!isResponse || groupId == 0) {
+			return false;
+		}
+		return pairingService.containsGroup(groupId) && !pairingService.hasResponse(groupId)
+				&& pairingService.isGroupMergeable(groupId);
+	}
+
+	private boolean shouldUnmergeExisting(int packetCount, long groupId) {
+		return packetCount == 3 && pairingService.containsGroup(groupId) && pairingService.hasResponse(groupId);
+	}
+
+	private byte[] getDisplayData(Packet packet) {
+		if (packet.getDecodedData().length > 0) {
+			return packet.getDecodedData();
+		}
+		return packet.getModifiedData();
+	}
+
+	private String resolveContentType(Packet requestPacket, Packet responsePacket) {
+		String contentType = requestPacket.getContentType();
+		if (contentType == null || contentType.isEmpty()) {
+			contentType = responsePacket.getContentType();
+		}
+		return contentType;
+	}
+
+	private void mergeResponseIntoRequestRow(Packet responsePacket, long groupId, int responsePacketId,
+			boolean refreshSelection) throws Exception {
+		Integer rowIndex = pairingService.getRowForGroup(groupId);
+		if (rowIndex == null) {
+			return;
+		}
+		int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, COL_ID);
+		tableModel.setValueAt(responsePacket.getSummarizedResponse(), rowIndex, COL_SERVER_RESPONSE);
+		int currentLength = (Integer) tableModel.getValueAt(rowIndex, COL_LENGTH);
+		tableModel.setValueAt(currentLength + getDisplayData(responsePacket).length, rowIndex, COL_LENGTH);
+		Packet requestPacket = packets.query(requestPacketId);
+		tableModel.setValueAt(resolveContentType(requestPacket, responsePacket), rowIndex, COL_CONTENT_TYPE);
+		pairingService.markGroupHasResponse(groupId);
+		pairingService.registerPairing(responsePacketId, requestPacketId);
+		id_row.put(responsePacketId, rowIndex);
+		if (refreshSelection && requestPacketId == getSelectedPacketId()) {
+			resolveAndShowPacket(requestPacket, true);
+		}
+	}
+
+	private void mergeResponseMappingOnly(int responsePacketId, long groupId) {
+		Integer rowIndex = pairingService.getRowForGroup(groupId);
+		if (rowIndex == null) {
+			return;
+		}
+		int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, COL_ID);
+		pairingService.markGroupHasResponse(groupId);
+		pairingService.registerPairing(responsePacketId, requestPacketId);
+		id_row.put(responsePacketId, rowIndex);
+	}
+
+	private void addNewRowWithGroupTracking(Packet packet, int packetId, boolean isResponse, long groupId)
+			throws Exception {
+		tableModel.addRow(makeRowDataFromPacket(packet));
+		int rowIndex = tableModel.getRowCount() - 1;
+		id_row.put(packetId, rowIndex);
+		if (!isResponse && groupId != 0) {
+			pairingService.registerGroupRow(groupId, rowIndex);
+		}
+	}
+
+	private void addNewAsyncPlaceholderRowWithGroupTracking(int packetId, boolean isResponse, long groupId) {
+		tableModel.addRow(new Object[]{packetId, "Loading...", "Loading...", 0, "Loading...", "", "Loading...", "",
+				"00:00:00 1900/01/01 Z", false, false, "", "", "", (long) -1});
+		int rowIndex = tableModel.getRowCount() - 1;
+		id_row.put(packetId, rowIndex);
+		if (!isResponse && groupId != 0) {
+			pairingService.registerGroupRow(groupId, rowIndex);
+		}
+	}
+
+	private void trackRequestGroupIfNeeded(int packetId, long groupId) {
+		if (groupId == 0) {
+			return;
+		}
+		Integer rowIndex = id_row.get(packetId);
+		if (rowIndex == null) {
+			return;
+		}
+		pairingService.ensureGroupTracked(groupId, rowIndex);
+	}
+
+	private void resolveAndShowPacket(Packet packet, boolean forceRefresh) throws Exception {
+		int responsePacketId = pairingService.getResponsePacketIdForRequest(packet.getId());
+		if (responsePacketId != -1) {
+			Packet responsePacket = packets.query(responsePacketId);
+			gui_packet.setPackets(packet, responsePacket, forceRefresh);
+			return;
+		}
+		if (pairingService.containsResponsePairing(packet.getId())) {
+			int requestPacketId = pairingService.getRequestIdForResponse(packet.getId());
+			Packet requestPacket = packets.query(requestPacketId);
+			gui_packet.setPackets(requestPacket, packet, forceRefresh);
+			return;
+		}
+		long groupId = packet.getGroup();
+		boolean isStreaming = groupId != 0 && pairingService.isGroupStreaming(groupId);
+		if (isStreaming || packet.getDirection() == Packet.Direction.SERVER) {
+			gui_packet.setSinglePacket(packet, forceRefresh);
+			return;
+		}
+		gui_packet.setPackets(packet, null, forceRefresh);
 	}
 
 	/**
@@ -784,7 +848,7 @@ public class GUIHistory implements PropertyChangeListener {
 			return;
 		}
 
-		int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
+		int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, COL_ID);
 
 		// 以前マージされていたレスポンスパケットIDを取得してペアリングを解除
 		int responsePacketId = pairingService.unregisterPairingByRequestId(requestPacketId);
@@ -796,11 +860,9 @@ public class GUIHistory implements PropertyChangeListener {
 
 		// リクエスト行を元に戻す（Server Response列をクリア、Lengthを再計算）
 		Packet requestPacket = packets.query(requestPacketId);
-		byte[] requestData = requestPacket.getDecodedData().length > 0
-				? requestPacket.getDecodedData()
-				: requestPacket.getModifiedData();
-		tableModel.setValueAt("", rowIndex, 2); // Server Response列をクリア
-		tableModel.setValueAt(requestData.length, rowIndex, 3); // Length列を再計算
+		byte[] requestData = getDisplayData(requestPacket);
+		tableModel.setValueAt("", rowIndex, COL_SERVER_RESPONSE); // Server Response列をクリア
+		tableModel.setValueAt(requestData.length, rowIndex, COL_LENGTH); // Length列を再計算
 
 		// 以前マージされていたレスポンスパケット用の新しい行を追加
 		Packet responsePacket = packets.query(responsePacketId);
@@ -810,7 +872,7 @@ public class GUIHistory implements PropertyChangeListener {
 
 		// 選択中のパケットだった場合は詳細表示を更新
 		if (requestPacketId == getSelectedPacketId()) {
-			gui_packet.setPacket(requestPacket, true);
+			resolveAndShowPacket(requestPacket, true);
 		}
 	}
 
@@ -900,7 +962,7 @@ public class GUIHistory implements PropertyChangeListener {
 					Packet packet = get();
 					if (packet != null) {
 
-						gui_packet.setPacket(packet);
+						resolveAndShowPacket(packet, false);
 					}
 					// sortByText(gui_filter.getText());
 				} catch (Exception e) {
@@ -924,68 +986,14 @@ public class GUIHistory implements PropertyChangeListener {
 
 			long groupId = packet.getGroup();
 			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
-
-			// グループIDが設定されている場合、パケット数をカウント
-			int packetCount = 0;
-			if (groupId != 0) {
-				packetCount = pairingService.incrementGroupPacketCount(groupId);
-				// CLIENTパケットの場合はCLIENTカウントもインクリメント（ストリーミング判定用）
-				if (!isResponse) {
-					pairingService.incrementGroupClientPacketCount(groupId);
-				}
-			}
-
-			boolean containsGroup = pairingService.containsGroup(groupId);
-			boolean hasResponse = pairingService.hasResponse(groupId);
-
-			// パケット数が3になった時点で、既存のマージを解除する（ストリーミング通信対応）
-			if (packetCount == 3 && hasResponse && containsGroup) {
+			int packetCount = countAndTrackPacket(packet);
+			if (shouldUnmergeExisting(packetCount, groupId)) {
 				unmergeExistingPairing(groupId);
 			}
-
-			// レスポンスをリクエスト行にマージする条件
-			boolean shouldMerge = isResponse && groupId != 0 && pairingService.containsGroup(groupId)
-					&& !pairingService.hasResponse(groupId) && pairingService.isGroupMergeable(groupId);
-
-			if (shouldMerge) {
-
-				int rowIndex = pairingService.getRowForGroup(groupId);
-				int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
-
-				// Server Response列を更新
-				tableModel.setValueAt(packet.getSummarizedResponse(), rowIndex, 2);
-				// Length列を更新
-				int currentLength = (Integer) tableModel.getValueAt(rowIndex, 3);
-				byte[] responseData = packet.getDecodedData().length > 0
-						? packet.getDecodedData()
-						: packet.getModifiedData();
-				tableModel.setValueAt(currentLength + responseData.length, rowIndex, 3);
-
-				// Type列を更新
-				// リクエストパケットのContent-Typeが空の場合、レスポンスパケットのContent-Typeを使用
-				Packet requestPacket = packets.query(requestPacketId);
-				String contentType = requestPacket.getContentType();
-				if (contentType == null || contentType.isEmpty()) {
-					contentType = packet.getContentType();
-				}
-				tableModel.setValueAt(contentType, rowIndex, 11);
-
-				// マッピングを更新
-				pairingService.markGroupHasResponse(groupId);
-				pairingService.registerPairing(packet.getId(), requestPacketId);
-				id_row.put(packet.getId(), rowIndex);
+			if (shouldMergeResponse(groupId, isResponse)) {
+				mergeResponseIntoRequestRow(packet, groupId, packet.getId(), false);
 			} else {
-
-				// 新しい行を追加
-				tableModel.addRow(makeRowDataFromPacket(packet));
-				int rowIndex = tableModel.getRowCount() - 1;
-				id_row.put(packet.getId(), rowIndex);
-
-				// リクエストでグループIDがある場合はグループマッピングに追加
-				if (!isResponse && groupId != 0) {
-
-					pairingService.registerGroupRow(groupId, rowIndex);
-				}
+				addNewRowWithGroupTracking(packet, packet.getId(), isResponse, groupId);
 			}
 		}
 		update_packet_ids.clear();
@@ -1004,52 +1012,14 @@ public class GUIHistory implements PropertyChangeListener {
 			String color = packet.getColor();
 			long groupId = packet.getGroup();
 			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
-
-			// グループIDが設定されている場合、パケット数をカウント
-			int packetCount = 0;
-			if (groupId != 0) {
-				packetCount = pairingService.incrementGroupPacketCount(groupId);
-				// CLIENTパケットの場合はCLIENTカウントもインクリメント（ストリーミング判定用）
-				if (!isResponse) {
-					pairingService.incrementGroupClientPacketCount(groupId);
-				}
-			}
-
-			boolean containsGroup = pairingService.containsGroup(groupId);
-			boolean hasResponse = pairingService.hasResponse(groupId);
-
-			// パケット数が3になった時点で、既存のマージを解除する（ストリーミング通信対応）
-			// updateAllAsyncは軽量ロードのため、ここではマッピング解除とプレースホルダ行の追加のみ行う
-			if (packetCount == 3 && hasResponse && containsGroup) {
+			int packetCount = countAndTrackPacket(packet);
+			if (shouldUnmergeExisting(packetCount, groupId)) {
 				unmergeExistingPairingInAsyncModel(groupId);
 			}
-
-			// レスポンスをリクエスト行にマージする条件
-			boolean shouldMerge = isResponse && groupId != 0 && pairingService.containsGroup(groupId)
-					&& !pairingService.hasResponse(groupId) && pairingService.isGroupMergeable(groupId);
-
-			if (shouldMerge) {
-
-				int rowIndex = pairingService.getRowForGroup(groupId);
-				int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
-
-				// マッピングを更新（実際のデータは後で updateOne で更新される）
-				pairingService.markGroupHasResponse(groupId);
-				pairingService.registerPairing(id, requestPacketId);
-				id_row.put(id, rowIndex);
+			if (shouldMergeResponse(groupId, isResponse)) {
+				mergeResponseMappingOnly(id, groupId);
 			} else {
-
-				// 新しい行を追加
-				tableModel.addRow(new Object[]{packet.getId(), "Loading...", "Loading...", 0, "Loading...", "",
-						"Loading...", "", "00:00:00 1900/01/01 Z", false, false, "", "", "", (long) -1});
-				int rowIndex = tableModel.getRowCount() - 1;
-				id_row.put(id, rowIndex);
-
-				// リクエストでグループIDがある場合はグループマッピングに追加
-				if (!isResponse && groupId != 0) {
-
-					pairingService.registerGroupRow(groupId, rowIndex);
-				}
+				addNewAsyncPlaceholderRowWithGroupTracking(id, isResponse, groupId);
 			}
 
 			if (Objects.equals(color, "green")) {
@@ -1140,7 +1110,7 @@ public class GUIHistory implements PropertyChangeListener {
 			return;
 		}
 
-		int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
+		int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, COL_ID);
 
 		int responsePacketId = pairingService.unregisterPairingByRequestId(requestPacketId);
 		pairingService.unmergeGroup(groupId);
@@ -1166,20 +1136,8 @@ public class GUIHistory implements PropertyChangeListener {
 		boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
 		long groupId = packet.getGroup();
 
-		// リクエストパケットの場合、groupIdが変更されている可能性があるのでマッピングを更新
-		// （encoder.setGroupId()によってgroupIdが変更された場合の対応）
 		if (!isResponse && groupId != 0) {
-
-			Integer row_index = id_row.get(packetId);
-			if (row_index != null && !pairingService.containsGroup(groupId)) {
-
-				pairingService.registerGroupRow(groupId, row_index);
-				// カウントも更新（まだカウントされていない場合）
-				if (pairingService.getGroupPacketCount(groupId) == 0) {
-
-					pairingService.incrementGroupPacketCount(groupId);
-				}
-			}
+			trackRequestGroupIfNeeded(packetId, groupId);
 		}
 
 		// マージされたレスポンスパケットの場合、リクエスト行を更新
@@ -1189,24 +1147,15 @@ public class GUIHistory implements PropertyChangeListener {
 			if (row_index != null) {
 
 				// Server Response列を更新
-				tableModel.setValueAt(packet.getSummarizedResponse(), row_index, 2);
+				tableModel.setValueAt(packet.getSummarizedResponse(), row_index, COL_SERVER_RESPONSE);
 				// Length列を再計算
 				int requestPacketId = pairingService.getRequestIdForResponse(packetId);
 				Packet requestPacket = packets.query(requestPacketId);
-				byte[] requestData = requestPacket.getDecodedData().length > 0
-						? requestPacket.getDecodedData()
-						: requestPacket.getModifiedData();
-				byte[] responseData = packet.getDecodedData().length > 0
-						? packet.getDecodedData()
-						: packet.getModifiedData();
-				tableModel.setValueAt(requestData.length + responseData.length, row_index, 3);
+				byte[] requestData = getDisplayData(requestPacket);
+				byte[] responseData = getDisplayData(packet);
+				tableModel.setValueAt(requestData.length + responseData.length, row_index, COL_LENGTH);
 				// Type列を更新
-				// リクエストパケットのContent-Typeが空の場合、レスポンスパケットのContent-Typeを使用
-				String contentType = requestPacket.getContentType();
-				if (contentType == null || contentType.isEmpty()) {
-					contentType = packet.getContentType();
-				}
-				tableModel.setValueAt(contentType, row_index, 11);
+				tableModel.setValueAt(resolveContentType(requestPacket, packet), row_index, COL_CONTENT_TYPE);
 			}
 			return;
 		}
@@ -1223,7 +1172,7 @@ public class GUIHistory implements PropertyChangeListener {
 		for (int i = 0; i < columnNames.length; i++) {
 
 			// マージされた行のServer Response列（2）とLength列（3）はスキップ
-			if (isMergedRequestRow && (i == 2 || i == 3)) {
+			if (isMergedRequestRow && (i == COL_SERVER_RESPONSE || i == COL_LENGTH)) {
 
 				continue;
 			}

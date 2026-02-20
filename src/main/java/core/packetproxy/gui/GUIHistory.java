@@ -926,8 +926,21 @@ public class GUIHistory implements PropertyChangeListener {
 			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
 
 			// グループIDが設定されている場合、パケット数をカウント
+			int packetCount = 0;
 			if (groupId != 0) {
-				pairingService.incrementGroupPacketCount(groupId);
+				packetCount = pairingService.incrementGroupPacketCount(groupId);
+				// CLIENTパケットの場合はCLIENTカウントもインクリメント（ストリーミング判定用）
+				if (!isResponse) {
+					pairingService.incrementGroupClientPacketCount(groupId);
+				}
+			}
+
+			boolean containsGroup = pairingService.containsGroup(groupId);
+			boolean hasResponse = pairingService.hasResponse(groupId);
+
+			// パケット数が3になった時点で、既存のマージを解除する（ストリーミング通信対応）
+			if (packetCount == 3 && hasResponse && containsGroup) {
+				unmergeExistingPairing(groupId);
 			}
 
 			// レスポンスをリクエスト行にマージする条件
@@ -993,8 +1006,22 @@ public class GUIHistory implements PropertyChangeListener {
 			boolean isResponse = packet.getDirection() == Packet.Direction.SERVER;
 
 			// グループIDが設定されている場合、パケット数をカウント
+			int packetCount = 0;
 			if (groupId != 0) {
-				pairingService.incrementGroupPacketCount(groupId);
+				packetCount = pairingService.incrementGroupPacketCount(groupId);
+				// CLIENTパケットの場合はCLIENTカウントもインクリメント（ストリーミング判定用）
+				if (!isResponse) {
+					pairingService.incrementGroupClientPacketCount(groupId);
+				}
+			}
+
+			boolean containsGroup = pairingService.containsGroup(groupId);
+			boolean hasResponse = pairingService.hasResponse(groupId);
+
+			// パケット数が3になった時点で、既存のマージを解除する（ストリーミング通信対応）
+			// updateAllAsyncは軽量ロードのため、ここではマッピング解除とプレースホルダ行の追加のみ行う
+			if (packetCount == 3 && hasResponse && containsGroup) {
+				unmergeExistingPairingInAsyncModel(groupId);
 			}
 
 			// レスポンスをリクエスト行にマージする条件
@@ -1100,6 +1127,35 @@ public class GUIHistory implements PropertyChangeListener {
 		}.set(this, packetList.size())).start();
 	}
 
+	/**
+	 * updateAllAsync用のマージ解除処理。
+	 *
+	 * <p>
+	 * updateAllAsyncはIDと色のみを先に読み込み、実データは後続のupdateOneで補完するため、
+	 * ここではペアリング情報の解除と、マージされていたレスポンス用のプレースホルダ行追加のみを行う。
+	 */
+	private void unmergeExistingPairingInAsyncModel(long groupId) {
+		Integer rowIndex = pairingService.getRowForGroup(groupId);
+		if (rowIndex == null) {
+			return;
+		}
+
+		int requestPacketId = (Integer) tableModel.getValueAt(rowIndex, 0);
+
+		int responsePacketId = pairingService.unregisterPairingByRequestId(requestPacketId);
+		pairingService.unmergeGroup(groupId);
+
+		if (responsePacketId == -1) {
+			return;
+		}
+
+		// 以前マージされていたレスポンスパケット用のプレースホルダ行を追加（実データはupdateOneで更新される）
+		tableModel.addRow(new Object[]{responsePacketId, "Loading...", "Loading...", 0, "Loading...", "", "Loading...",
+				"", "00:00:00 1900/01/01 Z", false, false, "", "", "", (long) -1});
+		int newRowIndex = tableModel.getRowCount() - 1;
+		id_row.put(responsePacketId, newRowIndex);
+	}
+
 	private void updateOne(Packet packet) throws Exception {
 		if (id_row == null || packet == null) {
 
@@ -1155,16 +1211,19 @@ public class GUIHistory implements PropertyChangeListener {
 			return;
 		}
 
-		Integer row_index = id_row.getOrDefault(packetId, tableModel.getRowCount() - 1);
+		Integer row_index = id_row.get(packetId);
+		if (row_index == null || row_index < 0 || row_index >= tableModel.getRowCount()) {
+			return;
+		}
 		Object[] row_data = makeRowDataFromPacket(packet);
 
-		// リクエストパケットの更新時、マージされたレスポンス情報を保持
-		boolean hasResponse = groupId != 0 && pairingService.hasResponse(groupId);
+		// マージされたリクエスト行の場合、Server Response / Length はレスポンス側で更新するため保持する
+		boolean isMergedRequestRow = pairingService.isMergedRow(packetId);
 
 		for (int i = 0; i < columnNames.length; i++) {
 
 			// マージされた行のServer Response列（2）とLength列（3）はスキップ
-			if (hasResponse && (i == 2 || i == 3)) {
+			if (isMergedRequestRow && (i == 2 || i == 3)) {
 
 				continue;
 			}
@@ -1266,9 +1325,7 @@ public class GUIHistory implements PropertyChangeListener {
 	 * @param requestPacketId
 	 *            リクエストパケットID
 	 * @return レスポンスパケットID、存在しない場合は-1
-	 * @deprecated pairingService.getResponsePacketIdForRequest() を使用してください
 	 */
-	@Deprecated
 	public int getResponsePacketIdForRequest(int requestPacketId) {
 		return pairingService.getResponsePacketIdForRequest(requestPacketId);
 	}

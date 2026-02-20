@@ -168,13 +168,18 @@ class PacketPairingService {
   }
 
   /**
-   * グループがマージ可能かどうかを判定する パケット数が2以下の場合のみマージ可能
+   * グループがマージ可能かどうかを判定する
+   *
+   * 以下の両方を満たす場合のみマージ可能：
+   * - 総パケット数が2以下（3個以上はストリーミング等）
+   * - CLIENTパケット数が1以下（2個以上はストリーミングと判断し、マージしない）
+   *     - gRPCストリーミングでは同一グループ内にHEADERSフレームとDATAフレームで2つのCLIENTパケットが存在するため
    *
    * @param groupId グループID
    * @return マージ可能な場合true
    */
   fun isGroupMergeable(groupId: Long): Boolean {
-    return getGroupPacketCount(groupId) <= 2
+    return getGroupPacketCount(groupId) <= 2 && getGroupClientPacketCount(groupId) < 2
   }
 
   /**

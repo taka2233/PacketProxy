@@ -405,6 +405,7 @@ public class DuplexFactory {
 						oneshot.getUseSSL(), oneshot.getEncoder(), oneshot.getAlpn(), Packet.Direction.CLIENT,
 						duplex.hashCode(), UniqueID.getInstance().createId());
 				client_packet.setModified();
+				client_packet.setReceivedData(data);
 				client_packet.setDecodedData(data);
 				client_packet.setModifiedData(data);
 				if (data.length < SKIP_LENGTH) {

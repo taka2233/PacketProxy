@@ -86,6 +86,7 @@ public class GUIHistory implements PropertyChangeListener {
 	private static final int COL_ID = 0;
 	private static final int COL_SERVER_RESPONSE = 2;
 	private static final int COL_LENGTH = 3;
+	private static final int COL_MODIFIED = 10;
 	private static final int COL_CONTENT_TYPE = 11;
 
 	private static GUIHistory instance;
@@ -762,6 +763,8 @@ public class GUIHistory implements PropertyChangeListener {
 		tableModel.setValueAt(currentLength + getDisplayData(responsePacket).length, rowIndex, COL_LENGTH);
 		Packet requestPacket = packets.query(requestPacketId);
 		tableModel.setValueAt(resolveContentType(requestPacket, responsePacket), rowIndex, COL_CONTENT_TYPE);
+		boolean currentModified = (boolean) tableModel.getValueAt(rowIndex, COL_MODIFIED);
+		tableModel.setValueAt(currentModified || responsePacket.getModified(), rowIndex, COL_MODIFIED);
 		pairingService.markGroupHasResponse(groupId);
 		pairingService.registerPairing(responsePacketId, requestPacketId);
 		id_row.put(responsePacketId, rowIndex);
@@ -1154,6 +1157,9 @@ public class GUIHistory implements PropertyChangeListener {
 				tableModel.setValueAt(requestData.length + responseData.length, row_index, COL_LENGTH);
 				// Type列を更新
 				tableModel.setValueAt(resolveContentType(requestPacket, packet), row_index, COL_CONTENT_TYPE);
+				// Modified列を更新（リクエストまたはレスポンスのどちらかが改ざんされていれば true）
+				boolean currentModified = (boolean) tableModel.getValueAt(row_index, COL_MODIFIED);
+				tableModel.setValueAt(currentModified || packet.getModified(), row_index, COL_MODIFIED);
 			}
 			return;
 		}

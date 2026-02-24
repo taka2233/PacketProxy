@@ -21,6 +21,7 @@ import static packetproxy.util.Logging.log;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
@@ -30,19 +31,18 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.Rectangle;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
-import javax.swing.JScrollBar;
-import javax.swing.Scrollable;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.Scrollable;
 import javax.swing.border.LineBorder;
 import packetproxy.controller.ResendController;
 import packetproxy.controller.SinglePacketAttackController;
@@ -125,8 +125,7 @@ public class GUIData {
 	}
 
 	/**
-	 * ビューポートが十分に広い場合はボタンを中央寄せし、
-	 * 狭い場合は横スクロールバーを表示するためのパネル。
+	 * ビューポートが十分に広い場合はボタンを中央寄せし、 狭い場合は横スクロールバーを表示するためのパネル。
 	 * getScrollableTracksViewportWidth() でビューポート幅に追従するかを切り替える。
 	 */
 	private static class ScrollableCenteredPanel extends JPanel implements Scrollable {

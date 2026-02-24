@@ -22,6 +22,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
+import java.awt.event.ItemEvent;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.net.Inet4Address;
@@ -157,6 +158,12 @@ public class GUIOptionPrivateDNS implements PropertyChangeListener {
 		// dnsInterface.setPrototypeDisplayValue("xxxxxxx");
 		dnsInterface.setMaximumRowCount(dnsInterface.getItemCount());
 		dnsInterface.setSelectedItem("0.0.0.0");
+		dnsInterface.addItemListener(event -> {
+			if (event.getStateChange() != ItemEvent.SELECTED || event.getItem() == null) {
+				return;
+			}
+			restartPrivateDnsForBindingInterfaceChange();
+		});
 		dnsInterface.setMaximumSize(
 				new Dimension(dnsInterface.getMinimumSize().width, dnsInterface.getMinimumSize().height));
 		panel.add(dnsInterface);
@@ -479,6 +486,17 @@ public class GUIOptionPrivateDNS implements PropertyChangeListener {
 
 	public String getBindInterface() {
 		return this.dnsInterface.getSelectedItem().toString();
+	}
+
+	private void restartPrivateDnsForBindingInterfaceChange() {
+		try {
+			if (!privateDNS.isRunning()) {
+				return;
+			}
+			privateDNS.restart(new DNSSpoofingIPGetter(this));
+		} catch (Exception e) {
+			errWithStackTrace(e);
+		}
 	}
 
 	@Override

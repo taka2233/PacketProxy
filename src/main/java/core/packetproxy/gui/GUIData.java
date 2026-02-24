@@ -39,6 +39,7 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ScrollPaneConstants;
@@ -389,9 +390,12 @@ public class GUIData {
 			public void actionPerformed(ActionEvent e) {
 				try {
 
-					Diff.getInstance().markAsTarget(tabs.getRaw().getData());
-					DiffBinary.getInstance().markAsTarget(tabs.getBinary().getData());
-					DiffJson.getInstance().markAsTarget(tabs.getJson().getData());
+					byte[] data = resolveDataForDiff();
+					if (data == null)
+						return;
+					Diff.getInstance().markAsTarget(data);
+					DiffBinary.getInstance().markAsTarget(data);
+					DiffJson.getInstance().markAsTarget(data);
 					GUIDiffDialogParent dlg = new GUIDiffDialogParent(owner);
 					dlg.showDialog();
 				} catch (Exception e1) {
@@ -409,6 +413,9 @@ public class GUIData {
 			public void actionPerformed(ActionEvent e) {
 				try {
 
+					byte[] data = resolveDataForDiff();
+					if (data == null)
+						return;
 					if (isDiff) {
 
 						Diff.getInstance().clearAsOriginal();
@@ -424,9 +431,9 @@ public class GUIData {
 						}
 					}
 					isDiff = true;
-					Diff.getInstance().markAsOriginal(tabs.getRaw().getData());
-					DiffBinary.getInstance().markAsOriginal(tabs.getBinary().getData());
-					DiffJson.getInstance().markAsOriginal(tabs.getJson().getData());
+					Diff.getInstance().markAsOriginal(data);
+					DiffBinary.getInstance().markAsOriginal(data);
+					DiffJson.getInstance().markAsOriginal(data);
 					if (GUIHistory.getInstance().containsColor()) {
 
 						origColor = GUIHistory.getInstance().getColor();
@@ -528,5 +535,25 @@ public class GUIData {
 			errWithStackTrace(e);
 		}
 		return new byte[]{};
+	}
+
+	/**
+	 * マージ行（Request+Response両方ある行）の場合はどちらのデータをDiffに使うか
+	 * ユーザに選択させる。単一パケット行の場合はRequestデータをそのまま返す。 ダイアログでキャンセルされた場合は null を返す。
+	 */
+	private byte[] resolveDataForDiff() throws Exception {
+		if (!GUIHistory.getInstance().isSelectedRowMerged()) {
+			return tabs.getRaw().getData();
+		}
+		// macOS の JOptionPane はボタンを右から左に描画するため、
+		// 視覚的に左から「Request | Response」の順にするには逆順で定義する。
+		String[] options = {"Response", "Request"};
+		int choice = JOptionPane.showOptionDialog(owner, "Which data do you want to use for Diff?",
+				"Select Diff Target", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, null);
+		if (choice == JOptionPane.CLOSED_OPTION)
+			return null;
+		if (choice == 0)
+			return GUIPacket.getInstance().getResponsePacket().getReceivedData();
+		return tabs.getRaw().getData();
 	}
 }

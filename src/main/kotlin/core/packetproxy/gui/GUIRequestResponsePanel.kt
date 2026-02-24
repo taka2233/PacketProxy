@@ -191,7 +191,7 @@ class GUIRequestResponsePanel(private val owner: JFrame) {
             allSent.setData(packet.getSentData(), true)
             allSent.caretPosition = 0
           }
-          null -> return
+          null -> error("Unknown tab index: ${tabs.selectedIndex}")
         }
       } catch (e: Exception) {
         errWithStackTrace(e)

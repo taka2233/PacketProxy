@@ -134,13 +134,11 @@ public class GUIHistory implements PropertyChangeListener {
 	private boolean dialogOnce = false;
 	private GUIHistoryAutoScroll autoScroll;
 	private JPopupMenu menu;
+	private PacketPairingService pairingService;
 
 	private Color packetColorGreen = new Color(0x7f, 0xff, 0xd4);
 	private Color packetColorBrown = new Color(0xd2, 0x69, 0x1e);
 	private Color packetColorYellow = new Color(0xff, 0xd7, 0x00);
-
-	// パケットペアリングサービス
-	private PacketPairingService pairingService;
 
 	private GUIHistory(boolean restore) throws Exception {
 		packets = Packets.getInstance(restore);

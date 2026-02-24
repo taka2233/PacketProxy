@@ -183,9 +183,6 @@ public class NativeFileChooser {
 				dialog.setDirectory(currentDirectory.getAbsolutePath());
 			}
 
-			// Note: setFilenameFilter() does not work on macOS Finder.
-			// File filtering is not supported in native Mac file dialogs.
-
 			FilenameFilter filter = createFilenameFilter();
 			if (filter != null && !acceptAllFileFilterUsed && !fileFilters.isEmpty()) {
 				FilterEntry firstFilter = fileFilters.get(0);

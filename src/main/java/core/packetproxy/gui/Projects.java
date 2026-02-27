@@ -123,14 +123,12 @@ public class Projects {
 		return db.toString();
 	}
 
-	public String createNewProject(String name) throws Exception {
+	public String createNewProject(String name, Path directory) throws Exception {
 		if (name == null || name.trim().isEmpty()) {
 			throw new IllegalArgumentException("Project name cannot be empty");
 		}
-
-		var projectDir = Paths.get(System.getProperty("user.home"), ".packetproxy", "projects");
-		Files.createDirectories(projectDir);
-		var db = projectDir.resolve(name.trim() + ".sqlite3");
+		Files.createDirectories(directory);
+		var db = directory.resolve(name.trim() + ".sqlite3");
 		Database.getInstance().openAt(db.toString());
 		RecentProjectsStore.add(db);
 		return db.toString();

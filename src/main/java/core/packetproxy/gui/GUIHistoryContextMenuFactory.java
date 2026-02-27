@@ -280,6 +280,9 @@ public class GUIHistoryContextMenuFactory {
 				for (int i = 0; i < selected_rows.length; i++) {
 					Integer id = (Integer) table.getValueAt(selected_rows[i], 0);
 					colorManager.clear(id);
+					Packet packet = packets.query(id);
+					packet.setColor("");
+					packets.update(packet);
 				}
 			} catch (Exception ex) {
 				errWithStackTrace(ex);

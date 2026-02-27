@@ -137,6 +137,21 @@ public class NativeFileChooser {
 	}
 
 	/**
+	 * Show a directory dialog.
+	 *
+	 * @param parent
+	 *            The parent component
+	 * @return APPROVE_OPTION if a directory was selected, CANCEL_OPTION otherwise
+	 */
+	public int showDirectoryDialog(Component parent) {
+		if (PacketProxyUtility.getInstance().isMac()) {
+			return showNativeDirectoryDialog(parent);
+		} else {
+			return showSwingDirectoryDialog(parent);
+		}
+	}
+
+	/**
 	 * Get the Frame ancestor of the given component.
 	 *
 	 * @param parent
@@ -329,6 +344,56 @@ public class NativeFileChooser {
 				return ERROR_OPTION;
 			}
 
+			return CANCEL_OPTION;
+		} catch (Exception e) {
+			return ERROR_OPTION;
+		}
+	}
+
+	private int showNativeDirectoryDialog(Component parent) {
+		try {
+			// FileDialogをディレクトリ選択モードに切り替え
+			System.setProperty("apple.awt.fileDialogForDirectories", "true");
+			Frame frame = getFrame(parent);
+			FileDialog dialog = new FileDialog(frame, dialogTitle != null ? dialogTitle : "Select Directory",
+					FileDialog.LOAD);
+			if (currentDirectory != null) {
+				dialog.setDirectory(currentDirectory.getAbsolutePath());
+			}
+			dialog.setVisible(true);
+			String file = dialog.getFile();
+			String directory = dialog.getDirectory();
+			if (file != null && directory != null) {
+				selectedFile = new File(directory, file);
+				return APPROVE_OPTION;
+			}
+			return CANCEL_OPTION;
+
+		} catch (Exception e) {
+			return ERROR_OPTION;
+		} finally {
+			// ディレクトリ選択モードを元に戻す
+			System.setProperty("apple.awt.fileDialogForDirectories", "false");
+		}
+	}
+
+	private int showSwingDirectoryDialog(Component parent) {
+		try {
+			JFileChooser chooser = new JFileChooser();
+			if (currentDirectory != null) {
+				chooser.setCurrentDirectory(currentDirectory);
+			}
+			if (dialogTitle != null) {
+				chooser.setDialogTitle(dialogTitle);
+			}
+			chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+			int result = chooser.showOpenDialog(parent);
+			if (result == JFileChooser.APPROVE_OPTION) {
+				selectedFile = chooser.getSelectedFile();
+				return APPROVE_OPTION;
+			} else if (result == JFileChooser.ERROR_OPTION) {
+				return ERROR_OPTION;
+			}
 			return CANCEL_OPTION;
 		} catch (Exception e) {
 			return ERROR_OPTION;

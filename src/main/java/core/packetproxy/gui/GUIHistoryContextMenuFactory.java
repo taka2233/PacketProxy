@@ -28,6 +28,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JFrame;
+import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
@@ -347,16 +348,20 @@ public class GUIHistoryContextMenuFactory {
 
 		menu.add(send);
 		menu.add(sendToResender);
+		menu.add(bulkSender);
 		menu.add(copyAll);
 		menu.add(copy);
-		menu.add(bulkSender);
+		menu.add(copyAsCurl);
 		menu.add(saveAll);
 		menu.add(saveHttpBody);
-		menu.add(addColorG);
-		menu.add(addColorB);
-		menu.add(addColorY);
+
+		JMenu colorMenu = new JMenu("add color");
+		menu.add(colorMenu);
+		colorMenu.add(addColorG);
+		colorMenu.add(addColorB);
+		colorMenu.add(addColorY);
 		menu.add(clearColor);
-		menu.add(copyAsCurl);
+		
 		menu.add(delete_selected_items);
 		menu.add(delete_all);
 

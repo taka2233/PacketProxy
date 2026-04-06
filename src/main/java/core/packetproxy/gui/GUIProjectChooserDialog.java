@@ -182,6 +182,9 @@ public class GUIProjectChooserDialog {
 					}
 				} catch (Exception ex) {
 					errWithStackTrace(ex);
+					JOptionPane.showMessageDialog(dialog,
+							I18nString.get("Failed to create project") + "\n" + ex.getMessage(),
+							I18nString.get("Error"), JOptionPane.ERROR_MESSAGE);
 				}
 			});
 			content.add(wrap(btnNew));
@@ -409,12 +412,11 @@ public class GUIProjectChooserDialog {
 		if (name.isEmpty()) {
 			return false;
 		}
-
 		var saveDir = Paths.get(locationField.getText());
 		var targetFile = saveDir.resolve(name + ".sqlite3");
 
 		if (Files.exists(targetFile)) {
-			var message = String.format(I18nString.get("already exists. Overwrite?"), targetFile.getFileName());
+			var message = I18nString.get("%s already exists. Overwrite?", targetFile.getFileName());
 			var overwrite = JOptionPane.showConfirmDialog(parent, message, I18nString.get("Confirm Overwrite"),
 					JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
 			if (overwrite != JOptionPane.YES_OPTION) {
